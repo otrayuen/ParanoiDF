@@ -39,6 +39,8 @@
 #Author: PDFMINER
 
 import sys
+import py3compat
+py3compat.install()
 from pdfminer.pdfdocument import PDFDocument
 from pdfminer.pdfparser import PDFParser
 from pdfminer.pdfinterp import PDFResourceManager, PDFPageInterpreter
@@ -53,11 +55,11 @@ from pdfminer.image import ImageWriter
 def main(argv):
     import getopt
     def usage():
-        print ('usage: %s [-d] [-p pagenos] [-m maxpages] [-P password] [-o output]'
+        print(('usage: %s [-d] [-p pagenos] [-m maxpages] [-P password] [-o output]'
                ' [-C] [-n] [-A] [-V] [-M char_margin] [-L line_margin] [-W word_margin]'
                ' [-F boxes_flow] [-Y layout_mode] [-O output_dir] [-R rotation]'
                ' [-t text|html|xml|tag] [-c codec] [-s scale]'
-               ' file ...' % argv[0])
+               ' file ...' % argv[0]))
         return 100
     try:
         (opts, args) = getopt.getopt(argv[1:], 'dp:m:P:o:CnAVM:L:W:F:Y:O:R:t:c:s:')
@@ -121,7 +123,7 @@ def main(argv):
             elif outfile.endswith('.tag'):
                 outtype = 'tag'
     if outfile:
-        outfp = file(outfile, 'w')
+        outfp = open(outfile, 'w')
     else:
         outfp = sys.stdout
     if outtype == 'text':
@@ -139,7 +141,7 @@ def main(argv):
     else:
         return usage()
     for fname in args:
-        fp = file(fname, 'rb')
+        fp = py3compat.Latin1File(open(fname, 'rb'))
         interpreter = PDFPageInterpreter(rsrcmgr, device)
         for page in PDFPage.get_pages(fp, pagenos,
                                       maxpages=maxpages, password=password,

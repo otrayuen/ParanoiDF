@@ -43,13 +43,13 @@ import sys
 import os
 import optparse
 import re
-import urllib2
+import urllib.request, urllib.error, urllib.parse
 import datetime
 import hashlib
 import traceback
 import subprocess
-import apt
 from datetime import datetime
+import py3compat
 from PDFCore import PDFParser, vulnsDict
 from PDFUtils import vtcheck
 
@@ -67,7 +67,7 @@ def getRepPaths(url, path = ''):
     dumbReFiles = '<li><a[^>]*?>([^/]*?)</a></li>'
     
     try:
-        browsingPage = urllib2.urlopen(url+path).read()
+        browsingPage = urllib.request.urlopen(url+path).read()
     except:
         sys.exit('[x] Connection error while getting browsing page "'+url+path+'"')
     dirs = re.findall(dumbReDirs, browsingPage)
@@ -88,13 +88,13 @@ def getRepPaths(url, path = ''):
 
 def getLocalFilesInfo(filesList):
     localFilesInfo = {}
-    print '[-] Getting local files information...'
+    print('[-] Getting local files information...')
     for path in filesList:
         if os.path.exists(path):
             content = open(path,'rb').read()
-            shaHash = hashlib.sha256(content).hexdigest()
+            shaHash = py3compat.sha256(content).hexdigest()
             localFilesInfo[path] = shaHash
-    print '[+] Done'
+    print('[+] Done')
     return localFilesInfo
 
 def getPeepXML(statsDict, version, revision):
@@ -216,7 +216,7 @@ def getPeepXML(statsDict, version, revision):
                 elementsList = etree.SubElement(suspicious, 'elements')
                 for element in elements:
                     elementInfo = etree.SubElement(elementsList, 'element', name = element)
-                    if vulnsDict.has_key(element):
+                    if element in vulnsDict:
                         vulnName = vulnsDict[element][0]
                         vulnCVEList = vulnsDict[element][1]
                         for vulnCVE in vulnCVEList:
@@ -228,7 +228,7 @@ def getPeepXML(statsDict, version, revision):
                 vulnsList = etree.SubElement(suspicious, 'js_vulns')
                 for vuln in vulns:
                     vulnInfo = etree.SubElement(vulnsList, 'vulnerable_function', name = vuln)
-                    if vulnsDict.has_key(vuln):
+                    if vuln in vulnsDict:
                         vulnName = vulnsDict[vuln][0]
                         vulnCVEList = vulnsDict[vuln][1]
                         for vulnCVE in vulnCVEList:
@@ -266,7 +266,7 @@ versionHeader = 'Version: ParanoiDF ' + version
 paranoiDFHeader =  versionHeader + newLine*2 +\
                url + newLine +\
                email + newLine +\
-	       university + newLine +\
+               university + newLine +\
                author + newLine 
 
 argsParser = optparse.OptionParser(usage='Usage: '+sys.argv[0]+' [options] InputFile',description=versionHeader)
@@ -298,43 +298,43 @@ try:
         staticColor = Fore.BLUE
         resetColor = Style.RESET_ALL
     if options.version:
-        print paranoiDFHeader
+        print(paranoiDFHeader)
           
     else:
         if len(args) == 1:
-		if not options.isFetchUrl:
-			fileName = args[0]
-           		if not os.path.exists(fileName):
-               			sys.exit('Error: The file "'+fileName+'" does not exist!!')
+                if not options.isFetchUrl:
+                        fileName = args[0]
+                        if not os.path.exists(fileName):
+                                sys.exit('Error: The file "'+fileName+'" does not exist!!')
         elif len(args) > 1 or (len(args) == 0 and not options.isInteractive and not options.scriptFile):
             sys.exit(argsParser.print_help())
             
         if options.scriptFile != None:
             if not os.path.exists(options.scriptFile):
-                sys.exit('Error: The script file "'+options.scriptFile+'" does not exist!!')	         
-	  
+                sys.exit('Error: The script file "'+options.scriptFile+'" does not exist!!')             
+          
 ##################################################################################################
 
-	if options.isFetchUrl: #Fetch PDF from URL using wget.
+        if options.isFetchUrl: #Fetch PDF from URL using wget.
             httpAddr = args[0]
-	    os.system('wget -r -A.pdf ' + httpAddr)
+            os.system('wget -r -A.pdf ' + httpAddr)
 
-	if options.isTextDisplay: #Use PDFminers 'pdf2txt.py' to parse and show text of PDF.
-	    pdfMinerDirCheck = dirCheck + '/pdfminer/'
-	    if not os.path.isdir(pdfMinerDirCheck):
-		print 'PdfMiner files not found, aborting.'
-		sys.exit()
-	    try:
-		file = open(dirCheck + '/pdf2txt.py')
-		file.close()
-		os.system('python ' + dirCheck + '/pdf2txt.py ' + fileName)
-	    except IOError:
-		print ''
-		print 'No pdf2txt.py script found, check source repository and re-download.'
-		print ''
-		sys.exit()
-	    sys.exit()	
-		
+        if options.isTextDisplay: #Use PDFminers 'pdf2txt.py' to parse and show text of PDF.
+            pdfMinerDirCheck = dirCheck + '/pdfminer/'
+            if not os.path.isdir(pdfMinerDirCheck):
+                print('PdfMiner files not found, aborting.')
+                sys.exit()
+            try:
+                file = open(dirCheck + '/pdf2txt.py')
+                file.close()
+                os.system('python3 ' + dirCheck + '/pdf2txt.py ' + fileName)
+            except IOError:
+                print('')
+                print('No pdf2txt.py script found, check source repository and re-download.')
+                print('')
+                sys.exit()
+            sys.exit()  
+                
 #################################################################################################
 
         if fileName != None:
@@ -348,13 +348,13 @@ try:
                     pdf.addError(ret[1])
                 else:
                     vtJsonDict = ret[1]
-                    if vtJsonDict.has_key('response_code'):
+                    if 'response_code' in vtJsonDict:
                         if vtJsonDict['response_code'] == 1:
-                            if vtJsonDict.has_key('positives') and vtJsonDict.has_key('total'):
+                            if 'positives' in vtJsonDict and 'total' in vtJsonDict:
                                 pdf.setDetectionRate([vtJsonDict['positives'], vtJsonDict['total']])
                             else:
                                 pdf.addError('Missing elements in the response from VirusTotal!!')
-                            if vtJsonDict.has_key('permalink'):
+                            if 'permalink' in vtJsonDict:
                                 pdf.setDetectionReport(vtJsonDict['permalink'])
                         else:
                             pdf.setDetectionRate(None)
@@ -366,7 +366,11 @@ try:
             try:
                 from lxml import etree
                 xml = getPeepXML(statsDict, version, revision)
+                if isinstance(xml, bytes):
+                    xml = xml.decode('utf-8')
                 sys.stdout.write(xml)
+            except ImportError:
+                sys.exit('XML output needs lxml. Install it with: pip install lxml')
             except:
                 errorMessage = '*** Error: Exception while generating the XML file!!'
                 traceback.print_exc(file=open(errorsFile,'a'))
@@ -414,16 +418,16 @@ try:
                             if statsDict['Detection'] != None:
                                  detectionColor = ''
                                  if COLORIZED_OUTPUT and not options.avoidColors:
-                                	 detectionLevel = statsDict['Detection'][0]/(statsDict['Detection'][1]/3)
-                                	 if detectionLevel == 0:
-                                	 	 detectionColor = alertColor
-                                	 elif detectionLevel == 1:
-                                	 	 detectionColor = warningColor  
+                                         detectionLevel = statsDict['Detection'][0]//(statsDict['Detection'][1]//3)
+                                         if detectionLevel == 0:
+                                                 detectionColor = alertColor
+                                         elif detectionLevel == 1:
+                                                 detectionColor = warningColor  
                                  detectionRate = '%s%d%s/%d' % (detectionColor, statsDict['Detection'][0], resetColor, statsDict['Detection'][1])
                                  if statsDict['Detection report'] != '':
                                      detectionReportInfo = beforeStaticLabel + 'Detection report: ' + resetColor + statsDict['Detection report'] + newLine
                             else:
-								 detectionRate = 'File not found on VirusTotal'
+                                                                 detectionRate = 'File not found on VirusTotal'
                             stats += beforeStaticLabel + 'Detection: ' + resetColor + detectionRate + newLine
                             stats += detectionReportInfo
                     stats += beforeStaticLabel + 'Version: ' + resetColor + statsDict['Version'] + newLine
@@ -484,7 +488,7 @@ try:
                                     stats += '\t\t' + beforeStaticLabel + action + ': ' + resetColor + str(actions[action]) + newLine
                             if vulns != None:
                                 for vuln in vulns:
-                                    if vulnsDict.has_key(vuln):
+                                    if vuln in vulnsDict:
                                         vulnName = vulnsDict[vuln][0]
                                         vulnCVEList = vulnsDict[vuln][1]
                                         stats += '\t\t' + beforeStaticLabel + vulnName + ' ('
@@ -495,7 +499,7 @@ try:
                                         stats += '\t\t' + beforeStaticLabel + vuln + ': ' + resetColor + str(vulns[vuln]) + newLine
                             if elements != None:
                                 for element in elements:
-                                    if vulnsDict.has_key(element):
+                                    if element in vulnsDict:
                                         vulnName = vulnsDict[element][0]
                                         vulnCVEList = vulnsDict[element][1]
                                         stats += '\t\t' + beforeStaticLabel + vulnName + ' ('
@@ -513,7 +517,7 @@ try:
                                 stats += '\t\t' + url + newLine
                         stats += newLine * 2
                 if fileName != None:
-                    print stats
+                    print(stats)
                 if options.isInteractive:
                     from PDFConsole import PDFConsole
                     console = PDFConsole(pdf, VT_KEY, options.avoidColors)
@@ -522,7 +526,7 @@ try:
                             console.cmdloop()
                         except:
                             errorMessage = '*** Error: Exception not handled using the interactive console!! Please, report it to the author!!\n\nTip: Try opening file using -f option.'
-                            print errorColor + errorMessage + resetColor + newLine
+                            print(errorColor + errorMessage + resetColor + newLine)
                             traceback.print_exc(file=open(errorsFile,'a'))
 
 except Exception as e:
@@ -533,7 +537,7 @@ except Exception as e:
     if excName == None or excName != 'PeepException':
         errorMessage = '*** Error: Exception not handled!!\n\nTip: Try analysing PDF using -f option.'
         traceback.print_exc(file=open(errorsFile,'a'))
-    print errorColor + errorMessage + resetColor + newLine
+    print(errorColor + errorMessage + resetColor + newLine)
 finally:
     if len(errorMessage) > 1:
         message = newLine + 'Please, don\'t forget to report the errors found:' + newLine*2 

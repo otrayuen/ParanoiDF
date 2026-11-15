@@ -6,19 +6,19 @@ try:
     import hashlib as md5
 except ImportError:
     import md5
-from psparser import PSEOF
-from psparser import literal_name
-from psparser import LIT, KWD, STRICT
-from pdftypes import PDFException, PDFTypeError, PDFNotImplementedError
-from pdftypes import PDFObjectNotFound, PDFStream
-from pdftypes import decipher_all
-from pdftypes import int_value
-from pdftypes import str_value, list_value, dict_value, stream_value
-from pdfparser import PDFSyntaxError
-from pdfparser import PDFStreamParser
-from arcfour import Arcfour
-from utils import choplist, nunpack
-from utils import decode_text
+from .psparser import PSEOF
+from .psparser import literal_name
+from .psparser import LIT, KWD, STRICT
+from .pdftypes import PDFException, PDFTypeError, PDFNotImplementedError
+from .pdftypes import PDFObjectNotFound, PDFStream
+from .pdftypes import decipher_all
+from .pdftypes import int_value
+from .pdftypes import str_value, list_value, dict_value, stream_value
+from .pdfparser import PDFSyntaxError
+from .pdfparser import PDFStreamParser
+from .arcfour import Arcfour
+from .utils import choplist, nunpack
+from .utils import decode_text
 
 
 ##  Exceptions
@@ -74,7 +74,7 @@ class PDFXRef(PDFBaseXRef):
         return
 
     def __repr__(self):
-        return '<PDFXRef: offsets=%r>' % (self.offsets.keys())
+        return '<PDFXRef: offsets=%r>' % (list(self.offsets.keys()))
 
     def load(self, parser, debug=0):
         while 1:
@@ -93,10 +93,10 @@ class PDFXRef(PDFBaseXRef):
             if len(f) != 2:
                 raise PDFNoValidXRef('Trailer not found: %r: line=%r' % (parser, line))
             try:
-                (start, nobjs) = map(long, f)
+                (start, nobjs) = list(map(int, f))
             except ValueError:
                 raise PDFNoValidXRef('Invalid line: %r: line=%r' % (parser, line))
-            for objid in xrange(start, start+nobjs):
+            for objid in range(start, start+nobjs):
                 try:
                     (_, line) = parser.nextline()
                 except PSEOF:
@@ -107,9 +107,9 @@ class PDFXRef(PDFBaseXRef):
                 (pos, genno, use) = f
                 if use != 'n':
                     continue
-                self.offsets[objid] = (None, long(pos), int(genno))
+                self.offsets[objid] = (None, int(pos), int(genno))
         if 1 <= debug:
-            print >>sys.stderr, 'xref objects:', self.offsets
+            print('xref objects:', self.offsets, file=sys.stderr)
         self.load_trailer(parser)
         return
 
@@ -132,7 +132,7 @@ class PDFXRef(PDFBaseXRef):
         return self.trailer
 
     def get_objids(self):
-        return self.offsets.iterkeys()
+        return iter(self.offsets.keys())
 
     def get_pos(self, objid):
         try:
@@ -146,7 +146,7 @@ class PDFXRef(PDFBaseXRef):
 class PDFXRefFallback(PDFXRef):
 
     def __repr__(self):
-        return '<PDFXRefFallback: offsets=%r>' % (self.offsets.keys())
+        return '<PDFXRefFallback: offsets=%r>' % (list(self.offsets.keys()))
 
     PDFOBJ_CUE = re.compile(r'^(\d+)\s+(\d+)\s+obj\b')
 
@@ -161,7 +161,7 @@ class PDFXRefFallback(PDFXRef):
                 parser.seek(pos)
                 self.load_trailer(parser)
                 if 1 <= debug:
-                    print >>sys.stderr, 'trailer: %r' % self.get_trailer()
+                    print('trailer: %r' % self.get_trailer(), file=sys.stderr)
                 break
             m = self.PDFOBJ_CUE.match(line)
             if not m:
@@ -190,7 +190,7 @@ class PDFXRefFallback(PDFXRef):
                 except PSEOF:
                     pass
                 n = min(n, len(objs)//2)
-                for index in xrange(n):
+                for index in range(n):
                     objid1 = objs[index*2]
                     self.offsets[objid1] = (objid, index, 0)
         return
@@ -227,9 +227,9 @@ class PDFXRefStream(PDFBaseXRef):
         self.entlen = self.fl1+self.fl2+self.fl3
         self.trailer = stream.attrs
         if 1 <= debug:
-            print >>sys.stderr, ('xref stream: objid=%s, fields=%d,%d,%d' %
+            print(('xref stream: objid=%s, fields=%d,%d,%d' %
                                  (', '.join(map(repr, self.ranges)),
-                                 self.fl1, self.fl2, self.fl3))
+                                 self.fl1, self.fl2, self.fl3)), file=sys.stderr)
         return
 
     def get_trailer(self):
@@ -237,7 +237,7 @@ class PDFXRefStream(PDFBaseXRef):
 
     def get_objids(self):
         for (start, nobjs) in self.ranges:
-            for i in xrange(nobjs):
+            for i in range(nobjs):
                 offset = self.entlen * i
                 ent = self.data[offset:offset+self.entlen]
                 f1 = nunpack(ent[:self.fl1], 1)
@@ -367,7 +367,7 @@ class PDFDocument(object):
             raise PDFNotImplementedError('Revision 4 encryption is currently unsupported')
         if 3 <= R:
             # 8
-            for _ in xrange(50):
+            for _ in range(50):
                 hash = md5.md5(hash.digest()[:length//8])
         key = hash.digest()[:length//8]
         if R == 2:
@@ -378,7 +378,7 @@ class PDFDocument(object):
             hash = md5.md5(self.PASSWORD_PADDING)  # 2
             hash.update(docid[0])  # 3
             x = Arcfour(key).process(hash.digest()[:16])  # 4
-            for i in xrange(1, 19+1):
+            for i in range(1, 19+1):
                 k = ''.join(chr(ord(c) ^ i) for c in key)
                 x = Arcfour(k).process(x)
             u1 = x+x  # 32bytes total
@@ -453,7 +453,7 @@ class PDFDocument(object):
         if not self.xrefs:
             raise PDFException('PDFDocument is not initialized')
         if 2 <= self.debug:
-            print >>sys.stderr, 'getobj: objid=%r' % (objid)
+            print('getobj: objid=%r' % (objid), file=sys.stderr)
         if objid in self._cached_objs:
             (obj, genno) = self._cached_objs[objid]
         else:
@@ -476,7 +476,7 @@ class PDFDocument(object):
             else:
                 raise PDFObjectNotFound(objid)
             if 2 <= self.debug:
-                print >>sys.stderr, 'register: objid=%r: %r' % (objid, obj)
+                print('register: objid=%r: %r' % (objid, obj), file=sys.stderr)
             if self.caching:
                 self._cached_objs[objid] = (obj, genno)
         if self.decipher:
@@ -552,7 +552,7 @@ class PDFDocument(object):
         for line in parser.revreadlines():
             line = line.strip()
             if 2 <= self.debug:
-                print >>sys.stderr, 'find_xref: %r' % line
+                print('find_xref: %r' % line, file=sys.stderr)
             if line == 'startxref':
                 break
             if line:
@@ -560,8 +560,8 @@ class PDFDocument(object):
         else:
             raise PDFNoValidXRef('Unexpected EOF')
         if 1 <= self.debug:
-            print >>sys.stderr, 'xref found: pos=%r' % prev
-        return long(prev)
+            print('xref found: pos=%r' % prev, file=sys.stderr)
+        return int(prev)
 
     # read xref table
     def read_xref_from(self, parser, start, xrefs):
@@ -573,7 +573,7 @@ class PDFDocument(object):
         except PSEOF:
             raise PDFNoValidXRef('Unexpected EOF')
         if 2 <= self.debug:
-            print >>sys.stderr, 'read_xref_from: start=%d, token=%r' % (start, token)
+            print('read_xref_from: start=%d, token=%r' % (start, token), file=sys.stderr)
         if isinstance(token, int):
             # XRefStream: PDF-1.5
             parser.seek(pos)
@@ -588,7 +588,7 @@ class PDFDocument(object):
         xrefs.append(xref)
         trailer = xref.get_trailer()
         if 1 <= self.debug:
-            print >>sys.stderr, 'trailer: %r' % trailer
+            print('trailer: %r' % trailer, file=sys.stderr)
         if 'XRefStm' in trailer:
             pos = int_value(trailer['XRefStm'])
             self.read_xref_from(parser, pos, xrefs)

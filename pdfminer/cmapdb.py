@@ -15,14 +15,14 @@ import sys
 import os
 import os.path
 import gzip
-import cPickle as pickle
+import pickle as pickle
 import struct
-from psparser import PSStackParser
-from psparser import PSSyntaxError, PSEOF
-from psparser import PSLiteral
-from psparser import literal_name
-from encodingdb import name2unicode
-from utils import choplist, nunpack
+from .psparser import PSStackParser
+from .psparser import PSSyntaxError, PSEOF
+from .psparser import PSLiteral
+from .psparser import literal_name
+from .encodingdb import name2unicode
+from .utils import choplist, nunpack
 
 
 class CMapError(Exception):
@@ -46,7 +46,7 @@ class CMap(object):
         assert isinstance(cmap, CMap)
 
         def copy(dst, src):
-            for (k, v) in src.iteritems():
+            for (k, v) in src.items():
                 if isinstance(v, dict):
                     d = {}
                     dst[k] = d
@@ -58,7 +58,7 @@ class CMap(object):
 
     def decode(self, code):
         if self.debug:
-            print >>sys.stderr, 'decode: %r, %r' % (self, code)
+            print('decode: %r, %r' % (self, code), file=sys.stderr)
         d = self.code2cid
         for c in code:
             c = ord(c)
@@ -75,7 +75,7 @@ class CMap(object):
         if code2cid is None:
             code2cid = self.code2cid
             code = ()
-        for (k, v) in sorted(code2cid.iteritems()):
+        for (k, v) in sorted(code2cid.items()):
             c = code+(k,)
             if isinstance(v, int):
                 out.write('code %r = cid %d\n' % (c, v))
@@ -115,11 +115,11 @@ class UnicodeMap(object):
 
     def get_unichr(self, cid):
         if self.debug:
-            print >>sys.stderr, 'get_unichr: %r, %r' % (self, cid)
+            print('get_unichr: %r, %r' % (self, cid), file=sys.stderr)
         return self.cid2unichr[cid]
 
     def dump(self, out=sys.stdout):
-        for (k, v) in sorted(self.cid2unichr.iteritems()):
+        for (k, v) in sorted(self.cid2unichr.items()):
             out.write('cid %d = unicode %r\n' % (k, v))
         return
 
@@ -182,9 +182,9 @@ class FileUnicodeMap(UnicodeMap):
             self.cid2unichr[cid] = name2unicode(code.name)
         elif isinstance(code, str):
             # Interpret as UTF-16BE.
-            self.cid2unichr[cid] = unicode(code, 'UTF-16BE', 'ignore')
+            self.cid2unichr[cid] = str(code, 'UTF-16BE', 'ignore')
         elif isinstance(code, int):
-            self.cid2unichr[cid] = unichr(code)
+            self.cid2unichr[cid] = chr(code)
         else:
             raise TypeError(code)
         return
@@ -239,7 +239,7 @@ class CMapDB(object):
     def _load_data(klass, name):
         filename = '%s.pickle.gz' % name
         if klass.debug:
-            print >>sys.stderr, 'loading:', name
+            print('loading:', name, file=sys.stderr)
         cmap_paths = (os.environ.get('CMAP_PATH', '/usr/share/pdfminer/'),
                       os.path.join(os.path.dirname(__file__), 'cmap'),)
         for directory in cmap_paths:
@@ -352,7 +352,7 @@ class CMapParser(PSStackParser):
                 e1 = nunpack(evar)
                 vlen = len(svar)
                 #assert s1 <= e1
-                for i in xrange(e1-s1+1):
+                for i in range(e1-s1+1):
                     x = sprefix+struct.pack('>L', s1+i)[-vlen:]
                     self.cmap.add_code2cid(x, cid+i)
             return
@@ -380,14 +380,14 @@ class CMapParser(PSStackParser):
                 e1 = nunpack(e)
                 #assert s1 <= e1
                 if isinstance(code, list):
-                    for i in xrange(e1-s1+1):
+                    for i in range(e1-s1+1):
                         self.cmap.add_cid2unichr(s1+i, code[i])
                 else:
                     var = code[-4:]
                     base = nunpack(var)
                     prefix = code[:-4]
                     vlen = len(var)
-                    for i in xrange(e1-s1+1):
+                    for i in range(e1-s1+1):
                         x = prefix+struct.pack('>L', base+i)[-vlen:]
                         self.cmap.add_cid2unichr(s1+i, x)
             return
@@ -417,7 +417,7 @@ class CMapParser(PSStackParser):
 def main(argv):
     args = argv[1:]
     for fname in args:
-        fp = file(fname, 'rb')
+        fp = open(fname, 'rb')
         cmap = FileUnicodeMap()
         #cmap = FileCMap()
         CMapParser(cmap, fp).run()

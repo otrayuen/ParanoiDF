@@ -1,16 +1,16 @@
 #!/usr/bin/env python
 import sys
 try:
-    from cStringIO import StringIO
+    from io import StringIO
 except ImportError:
-    from StringIO import StringIO
-from psparser import PSStackParser
-from psparser import PSSyntaxError, PSEOF
-from psparser import KWD, STRICT
-from pdftypes import PDFException
-from pdftypes import PDFStream, PDFObjRef
-from pdftypes import int_value
-from pdftypes import dict_value
+    from io import StringIO
+from .psparser import PSStackParser
+from .psparser import PSSyntaxError, PSEOF
+from .psparser import KWD, STRICT
+from .pdftypes import PDFException
+from .pdftypes import PDFStream, PDFObjRef
+from .pdftypes import int_value
+from .pdftypes import dict_value
 
 
 ##  Exceptions
@@ -119,8 +119,8 @@ class PDFParser(PSStackParser):
             self.seek(pos+objlen)
             # XXX limit objlen not to exceed object boundary
             if 2 <= self.debug:
-                print >>sys.stderr, 'Stream: pos=%d, objlen=%d, dic=%r, data=%r...' % \
-                                    (pos, objlen, dic, data[:10])
+                print('Stream: pos=%d, objlen=%d, dic=%r, data=%r...' % \
+                                    (pos, objlen, dic, data[:10]), file=sys.stderr)
             obj = PDFStream(dic, data, self.doc.decipher)
             self.push((pos, obj))
 

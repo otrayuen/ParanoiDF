@@ -72,6 +72,7 @@
 '''
 
 import sys, zlib, lzw, struct
+import py3compat
 from PDFUtils import getNumsFromBytes, getBytesFromBits, getBitsFromNum
 from ccitt import CCITTFax
 
@@ -186,7 +187,7 @@ def ascii85Decode(stream):
                 n += 1
                 b = b*85+(ord(c)-33)
                 if n == 5:
-                    decodedStream += struct.pack('>L',b)
+                    decodedStream += py3compat.pack('>L',b)
                     n = b = 0
             elif c == 'z':
                 assert n == 0
@@ -195,7 +196,7 @@ def ascii85Decode(stream):
                 if n:
                     for _ in range(5-n):
                         b = b*85+84
-                    decodedStream += struct.pack('>L',b)[:n-1]
+                    decodedStream += py3compat.pack('>L',b)[:n-1]
                 break
     except:
         return (-1,'Unspecified error')
@@ -267,31 +268,31 @@ def flateDecode(stream, parameters):
     '''
     decodedStream = ''
     try:
-        decodedStream = zlib.decompress(stream)
+        decodedStream = py3compat.decompress(stream)
     except:
         return (-1,'Error decompressing string')
 
     if parameters == None or parameters == {}:
         return (0,decodedStream)
     else:
-        if parameters.has_key('/Predictor'):
+        if '/Predictor' in parameters:
             predictor = parameters['/Predictor'].getRawValue()
         else:
             predictor = 1
         # Columns = number of samples per row
-        if parameters.has_key('/Columns'):
+        if '/Columns' in parameters:
             columns = parameters['/Columns'].getRawValue()
         else:
             columns = 1
         # Colors = number of components per sample
-        if parameters.has_key('/Colors'):
+        if '/Colors' in parameters:
             colors = parameters['/Colors'].getRawValue()
             if colors < 1:
                 colors = 1
         else:
             colors = 1
         # BitsPerComponent: number of bits per color component
-        if parameters.has_key('/BitsPerComponent'):
+        if '/BitsPerComponent' in parameters:
             bits = parameters['/BitsPerComponent'].getRawValue()
             if bits not in [1,2,4,8,16]:
                 bits = 8
@@ -313,28 +314,28 @@ def flateEncode(stream, parameters):
     encodedStream = ''
     if parameters == None or parameters == {}:
         try:
-            return (0,zlib.compress(stream))
+            return (0,py3compat.compress(stream))
         except:
             return (-1,'Error compressing string')
     else:
-        if parameters.has_key('/Predictor'):
+        if '/Predictor' in parameters:
             predictor = parameters['/Predictor'].getRawValue()
         else:
             predictor = 1
         # Columns = number of samples per row
-        if parameters.has_key('/Columns'):
+        if '/Columns' in parameters:
             columns = parameters['/Columns'].getRawValue()
         else:
             columns = 1
         # Colors = number of components per sample
-        if parameters.has_key('/Colors'):
+        if '/Colors' in parameters:
             colors = parameters['/Colors'].getRawValue()
             if colors < 1:
                 colors = 1
         else:
             colors = 1
         # BitsPerComponent: number of bits per color component
-        if parameters.has_key('/BitsPerComponent'):
+        if '/BitsPerComponent' in parameters:
             bits = parameters['/BitsPerComponent'].getRawValue()
             if bits not in [1,2,4,8,16]:
                 bits = 8
@@ -348,7 +349,7 @@ def flateEncode(stream, parameters):
         else:
             output = stream
         try:
-            return (0,zlib.compress(output))
+            return (0,py3compat.compress(output))
         except:
             return (-1,'Error compressing string')
 
@@ -368,30 +369,30 @@ def lzwDecode(stream, parameters):
     if parameters == None or parameters == {}:
         return (0,decodedStream)
     else:
-        if parameters.has_key('/Predictor'):
+        if '/Predictor' in parameters:
             predictor = parameters['/Predictor'].getRawValue()
         else:
             predictor = 1
         # Columns = number of samples per row
-        if parameters.has_key('/Columns'):
+        if '/Columns' in parameters:
             columns = parameters['/Columns'].getRawValue()
         else:
             columns = 1
         # Colors = number of components per sample
-        if parameters.has_key('/Colors'):
+        if '/Colors' in parameters:
             colors = parameters['/Colors'].getRawValue()
             if colors < 1:
                 colors = 1
         else:
             colors = 1
         # BitsPerComponent: number of bits per color component
-        if parameters.has_key('/BitsPerComponent'):
+        if '/BitsPerComponent' in parameters:
             bits = parameters['/BitsPerComponent'].getRawValue()
             if bits not in [1,2,4,8,16]:
                 bits = 8
         else:
             bits = 8
-        if parameters.has_key('/EarlyChange'):
+        if '/EarlyChange' in parameters:
             earlyChange = parameters['/EarlyChange'].getRawValue()
         else:
             earlyChange = 1
@@ -418,30 +419,30 @@ def lzwEncode(stream, parameters):
         except:
             return (-1,'Error compressing string')
     else:
-        if parameters.has_key('/Predictor'):
+        if '/Predictor' in parameters:
             predictor = parameters['/Predictor'].getRawValue()
         else:
             predictor = 1
         # Columns = number of samples per row
-        if parameters.has_key('/Columns'):
+        if '/Columns' in parameters:
             columns = parameters['/Columns'].getRawValue()
         else:
             columns = 1
         # Colors = number of components per sample
-        if parameters.has_key('/Colors'):
+        if '/Colors' in parameters:
             colors = parameters['/Colors'].getRawValue()
             if colors < 1:
                 colors = 1
         else:
             colors = 1
         # BitsPerComponent: number of bits per color component
-        if parameters.has_key('/BitsPerComponent'):
+        if '/BitsPerComponent' in parameters:
             bits = parameters['/BitsPerComponent'].getRawValue()
             if bits not in [1,2,4,8,16]:
                 bits = 8
         else:
             bits = 8
-        if parameters.has_key('/EarlyChange'):
+        if '/EarlyChange' in parameters:
             earlyChange = parameters['/EarlyChange'].getRawValue()
         else:
             earlyChange = 1
@@ -478,7 +479,7 @@ def pre_prediction(stream, predictor, columns, colors, bits):
     # PNG prediction
     if predictor >= 10 and predictor <= 15:
         # PNG prediction can vary from row to row
-        for row in xrange(len(stream) / columns):
+        for row in range(len(stream) // columns):
             rowdata = [ord(x) for x in stream[(row*columns):((row+1)*columns)]]
             filterByte = predictor - 10
             rowdata = [filterByte]+rowdata
@@ -512,12 +513,12 @@ def post_prediction(decodedStream, predictor, columns, colors, bits):
     '''
     
     output = ''
-    bytesPerRow = (colors * bits * columns + 7) / 8
+    bytesPerRow = (colors * bits * columns + 7) // 8
     
     # TIFF - 2
     # http://www.gnupdf.org/PNG_and_TIFF_Predictors_Filter#TIFF
     if predictor == 2:
-        numRows = len(decodedStream) / bytesPerRow
+        numRows = len(decodedStream) // bytesPerRow
         bitmask = 2 ** bits - 1
         outputBitsStream = ''
         for rowIndex in range(numRows):
@@ -541,11 +542,11 @@ def post_prediction(decodedStream, predictor, columns, colors, bits):
     # http://www.gnupdf.org/PNG_and_TIFF_Predictors_Filter#TIFF
     elif predictor >= 10 and predictor <= 15:
         bytesPerRow += 1
-        numRows = (len(decodedStream) + bytesPerRow -1) / bytesPerRow
+        numRows = (len(decodedStream) + bytesPerRow -1) // bytesPerRow
         numSamplesPerRow = columns + 1
-        bytesPerSample = (colors * bits + 7) / 8
+        bytesPerSample = (colors * bits + 7) // 8
         upRowdata = (0,) * numSamplesPerRow
-        for row in xrange(numRows):
+        for row in range(numRows):
             rowdata = [ord(x) for x in decodedStream[(row*bytesPerRow):((row+1)*bytesPerRow)]]
             # PNG prediction can vary from row to row
             filterByte = rowdata[0]
@@ -575,7 +576,7 @@ def post_prediction(decodedStream, predictor, columns, colors, bits):
                         prevSample = 0
                     else:
                         prevSample = rowdata[i-bytesPerSample]
-                    rowdata[i] = (rowdata[i] + ((prevSample+upSample)/2)) % 256                        
+                    rowdata[i] = (rowdata[i] + ((prevSample+upSample)//2)) % 256                        
             elif filterByte == 4:
                 # Paeth - 14
                 for i in range(1, numSamplesPerRow):
@@ -658,7 +659,7 @@ def ccittFaxDecode(stream, parameters):
             return (-1,'Error decompressing string')
     else:
         # K = A code identifying the encoding scheme used
-        if parameters.has_key('/K'):
+        if '/K' in parameters:
             k = parameters['/K'].getRawValue()
             if type(k) != int:
                 k = 0
@@ -669,7 +670,7 @@ def ccittFaxDecode(stream, parameters):
         else:
             k = 0
         # EndOfLine = A flag indicating whether end-of-line bit patterns are required to be present in the encoding.
-        if parameters.has_key('/EndOfLine'):
+        if '/EndOfLine' in parameters:
             eol = parameters['/EndOfLine'].getRawValue()
             if eol == 'true':
                 eol = True
@@ -678,7 +679,7 @@ def ccittFaxDecode(stream, parameters):
         else:
             eol = False
         # EncodedByteAlign = A flag indicating whether the filter expects extra 0 bits before each encoded line so that the line begins on a byte boundary
-        if parameters.has_key('/EncodedByteAlign'):
+        if '/EncodedByteAlign' in parameters:
             byteAlign = parameters['/EncodedByteAlign'].getRawValue()
             if byteAlign == 'true':
                 byteAlign = True
@@ -687,21 +688,21 @@ def ccittFaxDecode(stream, parameters):
         else:
             byteAlign = False
         # Columns = The width of the image in pixels.
-        if parameters.has_key('/Columns'):
+        if '/Columns' in parameters:
             columns = parameters['/Columns'].getRawValue()
             if type(columns) != int:
                 columns = 1728
         else:
             columns = 1728
         # Rows = The height of the image in scan lines.
-        if parameters.has_key('/Rows'):
+        if '/Rows' in parameters:
             rows = parameters['/Rows'].getRawValue()
             if type(rows) != int:
                 rows = 0
         else:
             rows = 0
         # EndOfBlock = number of samples per row
-        if parameters.has_key('/EndOfBlock'):
+        if '/EndOfBlock' in parameters:
             eob = parameters['/EndOfBlock'].getRawValue()
             if eob == 'false':
                 eob = False
@@ -710,7 +711,7 @@ def ccittFaxDecode(stream, parameters):
         else:
             eob = True
         # BlackIs1 = A flag indicating whether 1 bits are to be interpreted as black pixels and 0 bits as white pixels
-        if parameters.has_key('/BlackIs1'):
+        if '/BlackIs1' in parameters:
             blackIs1 = parameters['/BlackIs1'].getRawValue()
             if blackIs1 == 'true':
                 blackIs1 = True
@@ -719,7 +720,7 @@ def ccittFaxDecode(stream, parameters):
         else:
             blackIs1 = False
         # DamagedRowsBeforeError = The number of damaged rows of data to be tolerated before an error occurs
-        if parameters.has_key('/DamagedRowsBeforeError'):
+        if '/DamagedRowsBeforeError' in parameters:
             damagedRowsBeforeError = parameters['/DamagedRowsBeforeError'].getRawValue()
         else:
             damagedRowsBeforeError = 0
@@ -750,7 +751,7 @@ def crypt(stream, parameters):
     if parameters == None or parameters == {}:
         return (0, stream)
     else:
-        if not parameters.has_key('/Name') or parameters['/Name'] == None:
+        if '/Name' not in parameters or parameters['/Name'] == None:
             return (0, stream)
         else:
             cryptFilterName = parameters['/Name'].getValue()
@@ -771,7 +772,7 @@ def decrypt(stream, parameters):
     if parameters == None or parameters == {}:
         return (0, stream)
     else:
-        if not parameters.has_key('/Name') or parameters['/Name'] == None:
+        if '/Name' not in parameters or parameters['/Name'] == None:
             return (0, stream)
         else:
             cryptFilterName = parameters['/Name'].getValue()

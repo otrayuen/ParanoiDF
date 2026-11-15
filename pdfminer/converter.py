@@ -1,12 +1,12 @@
 #!/usr/bin/env python
 import sys
-from pdfdevice import PDFTextDevice
-from pdffont import PDFUnicodeNotDefined
-from layout import LTContainer, LTPage, LTText, LTLine, LTRect, LTCurve
-from layout import LTFigure, LTImage, LTChar, LTTextLine
-from layout import LTTextBox, LTTextBoxVertical, LTTextGroup
-from utils import apply_matrix_pt, mult_matrix
-from utils import enc, bbox2str
+from .pdfdevice import PDFTextDevice
+from .pdffont import PDFUnicodeNotDefined
+from .layout import LTContainer, LTPage, LTText, LTLine, LTRect, LTCurve
+from .layout import LTFigure, LTImage, LTChar, LTTextLine
+from .layout import LTTextBox, LTTextBoxVertical, LTTextGroup
+from .utils import apply_matrix_pt, mult_matrix
+from .utils import enc, bbox2str
 
 
 ##  PDFLayoutAnalyzer
@@ -85,7 +85,7 @@ class PDFLayoutAnalyzer(PDFTextDevice):
         # other shapes
         pts = []
         for p in path:
-            for i in xrange(1, len(p), 2):
+            for i in range(1, len(p), 2):
                 pts.append(apply_matrix_pt(self.ctm, (p[i], p[i+1])))
         self.cur_item.add(LTCurve(gstate.linewidth, pts))
         return
@@ -93,7 +93,7 @@ class PDFLayoutAnalyzer(PDFTextDevice):
     def render_char(self, matrix, font, fontsize, scaling, rise, cid):
         try:
             text = font.to_unichr(cid)
-            assert isinstance(text, unicode), text
+            assert isinstance(text, str), text
         except PDFUnicodeNotDefined:
             text = self.handle_undefined_char(font, cid)
         textwidth = font.char_width(cid)
@@ -104,7 +104,7 @@ class PDFLayoutAnalyzer(PDFTextDevice):
 
     def handle_undefined_char(self, font, cid):
         if self.debug:
-            print >>sys.stderr, 'undefined: %r, %r' % (font, cid)
+            print('undefined: %r, %r' % (font, cid), file=sys.stderr)
         return '(cid:%d)' % cid
 
     def receive_layout(self, ltpage):
@@ -151,7 +151,9 @@ class TextConverter(PDFConverter):
         return
 
     def write_text(self, text):
-        self.outfp.write(text.encode(self.codec, 'ignore'))
+        if isinstance(text, bytes):
+            text = text.decode(self.codec, 'ignore')
+        self.outfp.write(text)
         return
 
     def receive_layout(self, ltpage):
@@ -239,7 +241,7 @@ class HTMLConverter(PDFConverter):
 
     def write_footer(self):
         self.write('<div style="position:absolute; top:0px;">Page: %s</div>\n' %
-                   ', '.join('<a href="#%s">%s</a>' % (i, i) for i in xrange(1, self.pageno)))
+                   ', '.join('<a href="#%s">%s</a>' % (i, i) for i in range(1, self.pageno)))
         self.write('</body></html>\n')
         return
 

@@ -59,6 +59,7 @@ __author__ = 'Didier Stevens'
 __version__ = '0.1.4'
 __date__ = '2012/02/25'
 
+import py3compat
 import sys
 import zlib
 import platform
@@ -163,7 +164,7 @@ class cPDF:
                 else:
                     filter.insert(0, "/AHx")
             elif i.lower() == "f":
-                encodeddata = zlib.compress(encodeddata)
+                encodeddata = py3compat.compress(encodeddata)
                 if i == "f":
                     filter.insert(0, "/FlateDecode")
                 else:
@@ -191,7 +192,7 @@ class cPDF:
         self.appendString("\n")
         startxref = self.filesize()
         max = 0
-        for i in self.indirectObjects.keys():
+        for i in list(self.indirectObjects.keys()):
             if i > max:
                 max = i
         self.appendString("xref\n0 %d\n" % (max+1))
