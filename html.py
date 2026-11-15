@@ -58,12 +58,11 @@ import sys
 try:
     from bs4 import BeautifulSoup
 except ImportError:
-    # BeautifulSoup 4.x not installed trying BeautifulSoup 3.x 
+    # BeautifulSoup 4.x not installed trying BeautifulSoup 3.x
     try:
         from BeautifulSoup import BeautifulSoup
     except ImportError:
-        print ('BeautifulSoup not installed')
-        exit(-1)
+        BeautifulSoup = None
 
 class Parser:
     '''
@@ -84,13 +83,13 @@ class Parser:
             htmlrules = htmlparseconfig.splitlines()
         except:
             htmlrules = []
-            print 'Problem while parsing HTML parsing rules'
+            print('Problem while parsing HTML parsing rules')
 
         line = 0
         for htmlrule in htmlrules:
             line += 1
             htmlrule = re.sub('\n', '', htmlrule)
-            if not re.match('^\s*$|^#', htmlrule):
+            if not re.match('^\\s*$|^#', htmlrule):
                 htmlrule = re.sub('[ \t]+', ' ', htmlrule)
                 field = htmlrule.split(' ')
 
@@ -119,15 +118,15 @@ class Parser:
                 elif htmlrule.startswith('!filter'):
                     if len(field) > 2:
                         tag, value = field[1], ' '.join(field[2:])
-                        self.html_filters[tag] = re.sub('^\s+|\s+$', '', value)
+                        self.html_filters[tag] = re.sub('^\\s+|\\s+$', '', value)
                 else:
-                    print 'fatal: invalid htmlparse.config line: %d' % line
+                    print('fatal: invalid htmlparse.config line: %d' % line)
 
         if self.debug:
-            print ('done loading htmlparse, (%d parse_rules, %d definitions, '
+            print(('done loading htmlparse, (%d parse_rules, %d definitions, '
                    '%d filters)' % (len(self.html_parse_rules), 
                                     len(self.html_definitions), 
-                                    len(self.html_filters)))
+                                    len(self.html_filters))))
 
 
     def htmlparse(self, data):
@@ -138,6 +137,9 @@ class Parser:
         outheader, out = '', ''
         data = re.sub('\x00', '', data)
 
+        if BeautifulSoup is None:
+            print('BeautifulSoup not installed')
+            return '', ''
         try:
             soup = BeautifulSoup(data)
         except:
@@ -198,7 +200,7 @@ class Parser:
                     # if this fails, it means that we are trying to get the 
                     # result in python
                     if hformat in self.html_definitions: 
-                        myfmt = re.sub('^\s+', '', 
+                        myfmt = re.sub('^\\s+', '', 
                                        self.html_definitions[hformat]
                                        ).split('%s')
                         if len(myfmt) - 1 == len(outvals):
@@ -242,7 +244,7 @@ def main():
 !parse  script      *   rawSCRIPT:contents
 !parse  imagefield1 *   to_python:contents
 !filter script      <[/]?script[^>]*>|<!--|//-->
-!filter *           ^javascript:\s*|^return\s+
+!filter *           ^javascript:\\s*|^return\\s+
 '''
     #xfa:contenttype
     hparser = Parser(pdfparseconfig)
@@ -260,9 +262,9 @@ def main():
             fout = open('%s.out' % infile, 'wb')
             fout.write(parsed)
             fout.close()
-            print 'Wrote %s.out (%d bytes)' % (infile, len(parsed))
+            print('Wrote %s.out (%d bytes)' % (infile, len(parsed)))
         else:
-            print 'Nothing parsed for %s' % infile
+            print('Nothing parsed for %s' % infile)
 
 if __name__ == '__main__':
     main()

@@ -1,12 +1,12 @@
 #!/usr/bin/env python
 import zlib
-from lzw import lzwdecode
-from ascii85 import ascii85decode, asciihexdecode
-from runlength import rldecode
-from ccitt import ccittfaxdecode
-from psparser import PSException, PSObject
-from psparser import LIT, STRICT
-from utils import apply_png_predictor, isnumber
+from .lzw import lzwdecode
+from .ascii85 import ascii85decode, asciihexdecode
+from .runlength import rldecode
+from .ccitt import ccittfaxdecode
+from .psparser import PSException, PSObject
+from .psparser import LIT, STRICT
+from .utils import apply_png_predictor, isnumber
 
 LITERAL_CRYPT = LIT('Crypt')
 
@@ -87,7 +87,7 @@ def resolve_all(x, default=None):
     if isinstance(x, list):
         x = [resolve_all(v, default=default) for v in x]
     elif isinstance(x, dict):
-        for (k, v) in x.iteritems():
+        for (k, v) in x.items():
             x[k] = resolve_all(v, default=default)
     return x
 
@@ -100,7 +100,7 @@ def decipher_all(decipher, objid, genno, x):
     if isinstance(x, list):
         x = [decipher_all(decipher, objid, genno, v) for v in x]
     elif isinstance(x, dict):
-        for (k, v) in x.iteritems():
+        for (k, v) in x.items():
             x[k] = decipher_all(decipher, objid, genno, v)
     return x
 
@@ -236,7 +236,7 @@ class PDFStream(PDFObject):
                 # will get errors if the document is encrypted.
                 try:
                     data = zlib.decompress(data)
-                except zlib.error, e:
+                except zlib.error as e:
                     if STRICT:
                         raise PDFException('Invalid zlib bytes: %r, %r' % (e, data))
                     data = ''

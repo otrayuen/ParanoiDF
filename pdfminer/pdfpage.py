@@ -1,13 +1,13 @@
 #!/usr/bin/env python
 import sys
-from psparser import LIT
-from pdftypes import PDFObjectNotFound
-from pdftypes import resolve1
-from pdftypes import int_value, list_value, dict_value
-from pdfparser import PDFParser
-from pdfdocument import PDFDocument
-from pdfdocument import PDFEncryptionError
-from pdfdocument import PDFTextExtractionNotAllowed
+from .psparser import LIT
+from .pdftypes import PDFObjectNotFound
+from .pdftypes import resolve1
+from .pdftypes import int_value, list_value, dict_value
+from .pdfparser import PDFParser
+from .pdfdocument import PDFDocument
+from .pdfdocument import PDFEncryptionError
+from .pdfdocument import PDFTextExtractionNotAllowed
 
 # some predefined literals and keywords.
 LITERAL_PAGE = LIT('Page')
@@ -81,18 +81,18 @@ class PDFPage(object):
             else:
                 objid = obj.objid
                 tree = dict_value(obj).copy()
-            for (k, v) in parent.iteritems():
+            for (k, v) in parent.items():
                 if k in klass.INHERITABLE_ATTRS and k not in tree:
                     tree[k] = v
             if tree.get('Type') is LITERAL_PAGES and 'Kids' in tree:
                 if 1 <= debug:
-                    print >>sys.stderr, 'Pages: Kids=%r' % tree['Kids']
+                    print('Pages: Kids=%r' % tree['Kids'], file=sys.stderr)
                 for c in list_value(tree['Kids']):
                     for x in search(c, tree):
                         yield x
             elif tree.get('Type') is LITERAL_PAGE:
                 if 1 <= debug:
-                    print >>sys.stderr, 'Page: %r' % tree
+                    print('Page: %r' % tree, file=sys.stderr)
                 yield (objid, tree)
         pages = False
         if 'Pages' in document.catalog:

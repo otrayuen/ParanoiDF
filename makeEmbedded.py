@@ -123,33 +123,33 @@ def CreatePDFWithEmbeddedFile(pdfFileName, embeddedFileName, embeddedFileContent
 
 def main(options, embeddedFileName, pdfFileName):
 
-	nobinary = False
-	autoopen = False
-	button = False
-	stego = False
-	filters = 'f'
-	message = ''
-	if options != 0:
-		optionList = options.split(",")
-		for option in optionList:
-			if option.lower() == "t":
-				nobinary = True
-			elif option.lower() == "a":
-				autoopen = True
-			elif option.lower() == "b":
-				button = True
-			elif option.lower() == "s":
-				stego = True
-			elif "f=" in option:
-				filters = option[2:]
-			elif "m=" in option:
-				message = option[2:]
-			else:
-				print 'Option "%s" not recognised.' % option
+        nobinary = False
+        autoopen = False
+        button = False
+        stego = False
+        filters = 'f'
+        message = ''
+        if options != 0:
+                optionList = options.split(",")
+                for option in optionList:
+                        if option.lower() == "t":
+                                nobinary = True
+                        elif option.lower() == "a":
+                                autoopen = True
+                        elif option.lower() == "b":
+                                button = True
+                        elif option.lower() == "s":
+                                stego = True
+                        elif "f=" in option:
+                                filters = option[2:]
+                        elif "m=" in option:
+                                message = option[2:]
+                        else:
+                                print('Option "%s" not recognised.' % option)
     
         embeddedFileContent = ReadBinaryFile(embeddedFileName)
         if embeddedFileContent == None:
-            print('Error opening/reading file %s' % embeddedFileName)
+            print(('Error opening/reading file %s' % embeddedFileName))
         else:
             CreatePDFWithEmbeddedFile(pdfFileName, embeddedFileName, embeddedFileContent, filters, nobinary, autoopen, button, stego, message)
 

@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 import sys
 import re
-from utils import choplist
+from .utils import choplist
 
 STRICT = 0
 
@@ -184,7 +184,7 @@ class PSBaseParser(object):
         if not pos:
             pos = self.bufpos+self.charpos
         self.fp.seek(pos)
-        print >>sys.stderr, 'poll(%d): %r' % (pos, self.fp.read(n))
+        print('poll(%d): %r' % (pos, self.fp.read(n)), file=sys.stderr)
         self.fp.seek(pos0)
         return
 
@@ -192,7 +192,7 @@ class PSBaseParser(object):
         """Seeks the parser to the given position.
         """
         if 2 <= self.debug:
-            print >>sys.stderr, 'seek: %r' % pos
+            print('seek: %r' % pos, file=sys.stderr)
         self.fp.seek(pos)
         # reset the status for nextline()
         self.bufpos = pos
@@ -243,7 +243,7 @@ class PSBaseParser(object):
                 linebuf += self.buf[self.charpos:]
                 self.charpos = len(self.buf)
         if 2 <= self.debug:
-            print >>sys.stderr, 'nextline: %r' % ((linepos, linebuf),)
+            print('nextline: %r' % ((linepos, linebuf),), file=sys.stderr)
         return (linepos, linebuf)
 
     def revreadlines(self):
@@ -483,7 +483,7 @@ class PSBaseParser(object):
             self.charpos = self._parse1(self.buf, self.charpos)
         token = self._tokens.pop(0)
         if 2 <= self.debug:
-            print >>sys.stderr, 'nexttoken: %r' % (token,)
+            print('nexttoken: %r' % (token,), file=sys.stderr)
         return token
 
 
@@ -524,7 +524,7 @@ class PSStackParser(PSBaseParser):
 
     def add_results(self, *objs):
         if 2 <= self.debug:
-            print >>sys.stderr, 'add_results: %r' % (objs,)
+            print('add_results: %r' % (objs,), file=sys.stderr)
         self.results.extend(objs)
         return
 
@@ -532,7 +532,7 @@ class PSStackParser(PSBaseParser):
         self.context.append((pos, self.curtype, self.curstack))
         (self.curtype, self.curstack) = (type, [])
         if 2 <= self.debug:
-            print >>sys.stderr, 'start_type: pos=%r, type=%r' % (pos, type)
+            print('start_type: pos=%r, type=%r' % (pos, type), file=sys.stderr)
         return
 
     def end_type(self, type):
@@ -541,7 +541,7 @@ class PSStackParser(PSBaseParser):
         objs = [obj for (_, obj) in self.curstack]
         (pos, self.curtype, self.curstack) = self.context.pop()
         if 2 <= self.debug:
-            print >>sys.stderr, 'end_type: pos=%r, type=%r, objs=%r' % (pos, type, objs)
+            print('end_type: pos=%r, type=%r, objs=%r' % (pos, type, objs), file=sys.stderr)
         return (pos, objs)
 
     def do_keyword(self, pos, token):
@@ -556,7 +556,7 @@ class PSStackParser(PSBaseParser):
         while not self.results:
             (pos, token) = self.nexttoken()
             #print (pos,token), (self.curtype, self.curstack)
-            if isinstance(token, (int, long, float, bool, str, PSLiteral)):
+            if isinstance(token, (int, float, bool, str, PSLiteral)):
                 # normal token
                 self.push((pos, token))
             elif token == KEYWORD_ARRAY_BEGIN:
@@ -596,8 +596,8 @@ class PSStackParser(PSBaseParser):
                         raise
             else:
                 if 2 <= self.debug:
-                    print >>sys.stderr, 'do_keyword: pos=%r, token=%r, stack=%r' % \
-                          (pos, token, self.curstack)
+                    print('do_keyword: pos=%r, token=%r, stack=%r' % \
+                          (pos, token, self.curstack), file=sys.stderr)
                 self.do_keyword(pos, token)
             if self.context:
                 continue
@@ -605,7 +605,7 @@ class PSStackParser(PSBaseParser):
                 self.flush()
         obj = self.results.pop(0)
         if 2 <= self.debug:
-            print >>sys.stderr, 'nextobject: %r' % (obj,)
+            print('nextobject: %r' % (obj,), file=sys.stderr)
         return obj
 
 
@@ -663,12 +663,12 @@ func/a/b{(c)do*}def
     ]
 
     def get_tokens(self, s):
-        import StringIO
+        import io
 
         class MyParser(PSBaseParser):
             def flush(self):
                 self.add_results(*self.popall())
-        parser = MyParser(StringIO.StringIO(s))
+        parser = MyParser(io.StringIO(s))
         r = []
         try:
             while 1:
@@ -678,12 +678,12 @@ func/a/b{(c)do*}def
         return r
 
     def get_objects(self, s):
-        import StringIO
+        import io
 
         class MyParser(PSStackParser):
             def flush(self):
                 self.add_results(*self.popall())
-        parser = MyParser(StringIO.StringIO(s))
+        parser = MyParser(io.StringIO(s))
         r = []
         try:
             while 1:
@@ -694,13 +694,13 @@ func/a/b{(c)do*}def
 
     def test_1(self):
         tokens = self.get_tokens(self.TESTDATA)
-        print tokens
+        print(tokens)
         self.assertEqual(tokens, self.TOKENS)
         return
 
     def test_2(self):
         objs = self.get_objects(self.TESTDATA)
-        print objs
+        print(objs)
         self.assertEqual(objs, self.OBJS)
         return
 

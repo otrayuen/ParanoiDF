@@ -51,7 +51,7 @@ class JJDecoder(object):
         self.encoded_str = jj_encoded_data
         
     def clean(self):
-        self.encoded_str = re.sub('^\s+|\s+$', '', self.encoded_str)
+        self.encoded_str = re.sub('^\\s+|\\s+$', '', self.encoded_str)
         
     def checkPalindrome(self):
         startpos = -1

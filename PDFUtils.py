@@ -40,18 +40,25 @@
     Module with some misc functions
 '''
 
-import os, re, htmlentitydefs, json, urllib, urllib2
+import importlib.util
+import os, re, json, urllib.request, urllib.parse, urllib.error
+
+# The project ships html.py, which would shadow the stdlib html package.
+_entities_path = os.path.join(os.path.dirname(os.__file__), 'html', 'entities.py')
+_entities_spec = importlib.util.spec_from_file_location('stdlib_html_entities', _entities_path)
+_html_entities = importlib.util.module_from_spec(_entities_spec)
+_entities_spec.loader.exec_module(_html_entities)
 
 def clearScreen():
-	'''
+        '''
 		Simple method to clear the screen depending on the OS
 	'''
-	if os.name == 'nt':
-		os.system('cls')
-	elif os.name == 'posix':
-		os.system('reset')
-	elif os.name == 'mac':
-		os.system('clear')
+        if os.name == 'nt':
+                os.system('cls')
+        elif os.name == 'posix':
+                os.system('reset')
+        elif os.name == 'mac':
+                os.system('clear')
 
 def countArrayElements(array):
     '''
@@ -85,73 +92,73 @@ def countNonPrintableChars(string):
     return counter
 
 def decodeName(name):
-	'''
+        '''
         Decode the given PDF name
         
 		@param name: A PDFName string to decode
 		@return: A tuple (status,statusContent), where statusContent is the decoded PDF name in case status = 0 or an error in case status = -1
 	'''
-	decodedName = name
-	hexNumbers = re.findall('#([0-9a-f]{2})', name, re.DOTALL | re.IGNORECASE)
-	for hexNumber in hexNumbers:
-		try:
-			decodedName = decodedName.replace('#'+hexNumber,chr(int(hexNumber,16)))
-		except:
-			return (-1,'Error decoding name')
-	return (0,decodedName)
+        decodedName = name
+        hexNumbers = re.findall('#([0-9a-f]{2})', name, re.DOTALL | re.IGNORECASE)
+        for hexNumber in hexNumbers:
+                try:
+                        decodedName = decodedName.replace('#'+hexNumber,chr(int(hexNumber,16)))
+                except:
+                        return (-1,'Error decoding name')
+        return (0,decodedName)
 
 def decodeString(string):
-	'''
+        '''
         Decode the given PDF string
         
 		@param string: A PDFString to decode
 		@return A tuple (status,statusContent), where statusContent is the decoded PDF string in case status = 0 or an error in case status = -1
 	'''
-	decodedString = string
-	octalNumbers = re.findall('\\\\([0-7]{1-3})', decodedString, re.DOTALL)
-	for octal in octalNumbers:
-		try:
-			decodedString = decodedString.replace('\\\\'+octal,chr(int(octal,8)))
-		except:
-			return (-1,'Error decoding string')
-	return (0,decodedString)
+        decodedString = string
+        octalNumbers = re.findall('\\\\([0-7]{1-3})', decodedString, re.DOTALL)
+        for octal in octalNumbers:
+                try:
+                        decodedString = decodedString.replace('\\\\'+octal,chr(int(octal,8)))
+                except:
+                        return (-1,'Error decoding string')
+        return (0,decodedString)
 
 def encodeName(name):
-	'''
+        '''
         Encode the given PDF name
         
 		@param name: A PDFName string to encode
 		@return: A tuple (status,statusContent), where statusContent is the encoded PDF name in case status = 0 or an error in case status = -1
 	'''
-	encodedName = ''
-	if name[0] == '/':
-		name = name[1:]
-	for char in name:
-		if char == '\0':
-			encodedName += char
-		else:
-			try:
-				hex = '%x' % ord(char)
-				encodedName += '#'+hex
-			except:
-				return (-1,'Error encoding name')
-	return (0,'/'+encodedName)
+        encodedName = ''
+        if name[0] == '/':
+                name = name[1:]
+        for char in name:
+                if char == '\0':
+                        encodedName += char
+                else:
+                        try:
+                                hex = '%x' % ord(char)
+                                encodedName += '#'+hex
+                        except:
+                                return (-1,'Error encoding name')
+        return (0,'/'+encodedName)
 
 def encodeString(string):
-	'''
+        '''
         Encode the given PDF string
         
 		@param string: A PDFString to encode
 		@return: A tuple (status,statusContent), where statusContent is the encoded PDF string in case status = 0 or an error in case status = -1
 	'''
-	encodedString = ''
-	try:
-		for char in string:
-			octal = '%o' % ord(char)
-			encodedString += '\\'+(3-len(octal))*'0'+octal
-	except:
-		return (-1,'Error encoding string')
-	return (0,encodedString)
+        encodedString = ''
+        try:
+                for char in string:
+                        octal = '%o' % ord(char)
+                        encodedString += '\\'+(3-len(octal))*'0'+octal
+        except:
+                return (-1,'Error encoding string')
+        return (0,encodedString)
 
 def escapeRegExpString(string):
     '''
@@ -170,36 +177,36 @@ def escapeRegExpString(string):
     return escapedValue
     
 def escapeString(string):
-	'''
+        '''
         Escape the given string
         
 		@param string: A string to be escaped
 		@return: Escaped string
 	'''
-	toEscapeChars = ['\\','(',')']
-	escapedValue = ''
-	for i in range(len(string)):
-		if string[i] in toEscapeChars and (i == 0 or string[i-1] != '\\'):
-			if string[i] == '\\':
-				if len(string) > i+1 and re.match('[0-7]',string[i+1]):
-					escapedValue += string[i]
-				else:
-					escapedValue += '\\'+string[i]
-			else:
-				escapedValue += '\\'+string[i]
-		elif string[i] == '\r':
-			escapedValue += '\\r'
-		elif string[i] == '\n':
-			escapedValue += '\\n'
-		elif string[i] == '\t':
-			escapedValue += '\\t'
-		elif string[i] == '\b':
-			escapedValue += '\\b'
-		elif string[i] == '\f':
-			escapedValue += '\\f'
-		else:
-			escapedValue += string[i]
-	return escapedValue
+        toEscapeChars = ['\\','(',')']
+        escapedValue = ''
+        for i in range(len(string)):
+                if string[i] in toEscapeChars and (i == 0 or string[i-1] != '\\'):
+                        if string[i] == '\\':
+                                if len(string) > i+1 and re.match('[0-7]',string[i+1]):
+                                        escapedValue += string[i]
+                                else:
+                                        escapedValue += '\\'+string[i]
+                        else:
+                                escapedValue += '\\'+string[i]
+                elif string[i] == '\r':
+                        escapedValue += '\\r'
+                elif string[i] == '\n':
+                        escapedValue += '\\n'
+                elif string[i] == '\t':
+                        escapedValue += '\\t'
+                elif string[i] == '\b':
+                        escapedValue += '\\b'
+                elif string[i] == '\f':
+                        escapedValue += '\\f'
+                else:
+                        escapedValue += string[i]
+        return escapedValue
 
 def getBitsFromNum(num, bitsPerComponent = 8):
     '''
@@ -296,30 +303,30 @@ def getBytesFromFile(filename, offset, numBytes):
         bytesFile = open(filename,'rb')
         bytesFile.seek(offset)
         if offset+numBytes > fileSize:
-            bytes = bytesFile.read()
+            bytes = bytesFile.read().decode('latin-1')
         else:
-            bytes = bytesFile.read(numBytes)
+            bytes = bytesFile.read(numBytes).decode('latin-1')
         bytesFile.close()
         return (0,bytes)
     else:
         return (-1,'File does not exist')
 
 def hexToString(hexString):
-	'''
+        '''
 		Simple method to convert an hexadecimal string to ascii string
 		
 		@param hexString: A string in hexadecimal format
 		@return: A tuple (status,statusContent), where statusContent is an ascii string in case status = 0 or an error in case status = -1
 	'''
-	string = ''
-	if len(hexString) % 2 != 0:
-		hexString = '0'+hexString
-	try:
-		for i in range(0,len(hexString),2):
-			string += chr(int(hexString[i]+hexString[i+1],16))
-	except:
-		return (-1,'Error in hexadecimal conversion')
-	return (0,string)
+        string = ''
+        if len(hexString) % 2 != 0:
+                hexString = '0'+hexString
+        try:
+                for i in range(0,len(hexString),2):
+                        string += chr(int(hexString[i]+hexString[i+1],16))
+        except:
+                return (-1,'Error in hexadecimal conversion')
+        return (0,string)
 
 def numToHex(num, numBytes):
     '''
@@ -331,34 +338,34 @@ def numToHex(num, numBytes):
 	'''
     hexString = ''
     if not isinstance(num,int):
-    	return (-1,'Bad number')
+        return (-1,'Bad number')
     try:
-	    hexNumber = hex(num)[2:]
-	    if len(hexNumber) % 2 != 0:
-	        hexNumber = '0'+hexNumber
-	    for i in range(0,len(hexNumber)-1,2):
-	        hexString += chr(int(hexNumber[i]+hexNumber[i+1],16))
-	    hexString = '\0'*(numBytes-len(hexString))+hexString
+            hexNumber = hex(num)[2:]
+            if len(hexNumber) % 2 != 0:
+                hexNumber = '0'+hexNumber
+            for i in range(0,len(hexNumber)-1,2):
+                hexString += chr(int(hexNumber[i]+hexNumber[i+1],16))
+            hexString = '\0'*(numBytes-len(hexString))+hexString
     except:
-		return (-1,'Error in hexadecimal conversion')
+                return (-1,'Error in hexadecimal conversion')
     return (0,hexString)
-                  		
+                                
 def numToString(num, numDigits):
-	'''
+        '''
         Given a number returns its string format with the specified length, adding '0' if necessary
 		
 		@param num: A number (int)
 		@param numDigits: Length of the output string (int)
 		@return: A tuple (status,statusContent), where statusContent is a number in string format in case status = 0 or an error in case status = -1
 	'''
-	if not isinstance(num,int):
-		return (-1,'Bad number')
-	strNum = str(num)
-	if numDigits < len(strNum):
-		return (-1,'Bad digit number')
-	for i in range(numDigits-len(strNum)):
-		strNum = '0' + strNum
-	return (0,strNum)
+        if not isinstance(num,int):
+                return (-1,'Bad number')
+        strNum = str(num)
+        if numDigits < len(strNum):
+                return (-1,'Bad digit number')
+        for i in range(numDigits-len(strNum)):
+                strNum = '0' + strNum
+        return (0,strNum)
 
 def unescapeHTMLEntities(text):
     '''
@@ -376,59 +383,59 @@ def unescapeHTMLEntities(text):
             # character reference
             try:
                 if text[:3] == "&#x":
-                    return unichr(int(text[3:-1], 16))
+                    return chr(int(text[3:-1], 16))
                 else:
-                    return unichr(int(text[2:-1]))
+                    return chr(int(text[2:-1]))
             except ValueError:
                 pass
         else:
             # named entity
             try:
-                text = unichr(htmlentitydefs.name2codepoint[text[1:-1]])
+                text = chr(_html_entities.name2codepoint[text[1:-1]])
             except KeyError:
                 pass
         return text # leave as is
-    return re.sub("&#?\w+;", fixup, text)
+    return re.sub("&#?\\w+;", fixup, text)
    
 def unescapeString(string):
-	'''
+        '''
         Unescape the given string
         
 		@param string: An escaped string
 		@return: Unescaped string
 	'''
-	toUnescapeChars = ['\\','(',')']
-	unescapedValue = ''
-	i = 0
-	while i < len(string):
-		if string[i] == '\\' and i != len(string)-1:
-			if string[i+1] in toUnescapeChars:
-				if string[i+1] == '\\':
-					unescapedValue += '\\'
-					i += 1
-				else:
-					pass
-			elif string[i+1] == 'r':
-				i += 1
-				unescapedValue += '\r'
-			elif string[i+1] == 'n':
-				i += 1
-				unescapedValue += '\n'
-			elif string[i+1] == 't':
-				i += 1
-				unescapedValue += '\t'
-			elif string[i+1] == 'b':
-				i += 1
-				unescapedValue += '\b'
-			elif string[i+1] == 'f':
-				i += 1
-				unescapedValue += '\f'
-			else:
-				unescapedValue += string[i]
-		else:
-			unescapedValue += string[i]
-		i += 1
-	return unescapedValue
+        toUnescapeChars = ['\\','(',')']
+        unescapedValue = ''
+        i = 0
+        while i < len(string):
+                if string[i] == '\\' and i != len(string)-1:
+                        if string[i+1] in toUnescapeChars:
+                                if string[i+1] == '\\':
+                                        unescapedValue += '\\'
+                                        i += 1
+                                else:
+                                        pass
+                        elif string[i+1] == 'r':
+                                i += 1
+                                unescapedValue += '\r'
+                        elif string[i+1] == 'n':
+                                i += 1
+                                unescapedValue += '\n'
+                        elif string[i+1] == 't':
+                                i += 1
+                                unescapedValue += '\t'
+                        elif string[i+1] == 'b':
+                                i += 1
+                                unescapedValue += '\b'
+                        elif string[i+1] == 'f':
+                                i += 1
+                                unescapedValue += '\f'
+                        else:
+                                unescapedValue += string[i]
+                else:
+                        unescapedValue += string[i]
+                i += 1
+        return unescapedValue
     
 def vtcheck(md5, vtKey):
     '''
@@ -441,9 +448,9 @@ def vtcheck(md5, vtKey):
     vtUrl = 'https://www.virustotal.com/vtapi/v2/file/report'
     parameters = {'resource':md5,'apikey':vtKey}
     try:
-        data = urllib.urlencode(parameters)
-        req = urllib2.Request(vtUrl, data)
-        response = urllib2.urlopen(req)
+        data = urllib.parse.urlencode(parameters).encode('utf-8')
+        req = urllib.request.Request(vtUrl, data)
+        response = urllib.request.urlopen(req)
         jsonResponse = response.read()
     except:
         return (-1, 'The request to VirusTotal has not been successful')

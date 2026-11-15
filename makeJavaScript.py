@@ -51,36 +51,36 @@
 import mPDF
 
 def main(option, outputFile):
-	oPDF = mPDF.cPDF(outputFile)
+        oPDF = mPDF.cPDF(outputFile)
 
-	oPDF.header()
+        oPDF.header()
 
-	oPDF.indirectobject(1, 0, '<<\n /Type /Catalog\n /Outlines 2 0 R\n /Pages 3 0 R\n /OpenAction 7 0 R\n>>')
-	oPDF.indirectobject(2, 0, '<<\n /Type /Outlines\n /Count 0\n>>')
-	oPDF.indirectobject(3, 0, '<<\n /Type /Pages\n /Kids [4 0 R]\n /Count 1\n>>')
-	oPDF.indirectobject(4, 0, '<<\n /Type /Page\n /Parent 3 0 R\n /MediaBox [0 0 612 792]\n /Contents 5 0 R\n /Resources <<\n             /ProcSet [/PDF /Text]\n             /Font << /F1 6 0 R >>\n            >>\n>>')
-	oPDF.stream(5, 0, 'BT /F1 12 Tf 100 700 Td 15 TL (JavaScript example) Tj ET')
-	oPDF.indirectobject(6, 0, '<<\n /Type /Font\n /Subtype /Type1\n /Name /F1\n /BaseFont /Helvetica\n /Encoding /MacRomanEncoding\n>>')
+        oPDF.indirectobject(1, 0, '<<\n /Type /Catalog\n /Outlines 2 0 R\n /Pages 3 0 R\n /OpenAction 7 0 R\n>>')
+        oPDF.indirectobject(2, 0, '<<\n /Type /Outlines\n /Count 0\n>>')
+        oPDF.indirectobject(3, 0, '<<\n /Type /Pages\n /Kids [4 0 R]\n /Count 1\n>>')
+        oPDF.indirectobject(4, 0, '<<\n /Type /Page\n /Parent 3 0 R\n /MediaBox [0 0 612 792]\n /Contents 5 0 R\n /Resources <<\n             /ProcSet [/PDF /Text]\n             /Font << /F1 6 0 R >>\n            >>\n>>')
+        oPDF.stream(5, 0, 'BT /F1 12 Tf 100 700 Td 15 TL (JavaScript example) Tj ET')
+        oPDF.indirectobject(6, 0, '<<\n /Type /Font\n /Subtype /Type1\n /Name /F1\n /BaseFont /Helvetica\n /Encoding /MacRomanEncoding\n>>')
 
-	if option == 0:
-	    javascript = """app.alert({cMsg: 'Hello from PDF JavaScript', cTitle: 'Testing PDF JavaScript', nIcon: 3});"""
-	else:
-	    javaScriptFile = option
-	    try:
-		fileJavasScript = open(javaScriptFile, 'rb')
-	    except:
-		print "File %s not found." % javaScriptFile
-		return
+        if option == 0:
+            javascript = """app.alert({cMsg: 'Hello from PDF JavaScript', cTitle: 'Testing PDF JavaScript', nIcon: 3});"""
+        else:
+            javaScriptFile = option
+            try:
+                fileJavasScript = open(javaScriptFile, 'rb')
+            except:
+                print("File %s not found." % javaScriptFile)
+                return
 
-	    try:
-		javascript = fileJavasScript.read()
-	    except:
-		print "Error reading %s" % javaScriptFile
-		return
-	    finally:
-		fileJavasScript.close()
+            try:
+                javascript = fileJavasScript.read()
+            except:
+                print("Error reading %s" % javaScriptFile)
+                return
+            finally:
+                fileJavasScript.close()
 
-	oPDF.indirectobject(7, 0, '<<\n /Type /Action\n /S /JavaScript\n /JS (%s)\n>>' % javascript)
+        oPDF.indirectobject(7, 0, '<<\n /Type /Action\n /S /JavaScript\n /JS (%s)\n>>' % javascript)
 
-	oPDF.xrefAndTrailer('1 0 R')
+        oPDF.xrefAndTrailer('1 0 R')
 

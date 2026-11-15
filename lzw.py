@@ -96,6 +96,7 @@ __url__ = "http://www.joe-bowers.com/static/lzw"
 """
 
 
+import py3compat
 import struct
 import itertools
 
@@ -284,7 +285,7 @@ class BitPacker(object):
                 nextbits = tailbits[:8]
                 nextbytes = bitstobytes(nextbits)
                 for bt in nextbytes:
-                    yield struct.pack("B", bt)
+                    yield py3compat.pack("B", bt)
 
                 tailbits = tailbits[8:]
 
@@ -292,7 +293,7 @@ class BitPacker(object):
         if tailbits:
             tail = bitstobytes(tailbits)
             for bt in tail:
-                yield struct.pack("B", bt)
+                yield py3compat.pack("B", bt)
 
                 
 
@@ -473,7 +474,7 @@ class Decoder(object):
 
 
     def _clear_codes(self):
-        self._codepoints = dict( (pt, struct.pack("B", pt)) for pt in range(256) )
+        self._codepoints = dict( (pt, py3compat.pack("B", pt)) for pt in range(256) )
         self._codepoints[CLEAR_CODE] = CLEAR_CODE
         self._codepoints[END_OF_INFO_CODE] = END_OF_INFO_CODE
         self._prefix = None
@@ -582,7 +583,7 @@ class Encoder(object):
         # Teensy hack, CLEAR_CODE and END_OF_INFO_CODE aren't
         # equal to any possible string.
 
-        self._prefixes = dict( (struct.pack("B", codept), codept) for codept in range(256) )
+        self._prefixes = dict( (py3compat.pack("B", codept), codept) for codept in range(256) )
         self._prefixes[ CLEAR_CODE ] = CLEAR_CODE
         self._prefixes[ END_OF_INFO_CODE ] = END_OF_INFO_CODE
 
@@ -657,7 +658,7 @@ class PagingDecoder(object):
 
         try:
             while 1:
-                cp = codepoints.next()
+                cp = next(codepoints)
                 if cp != END_OF_INFO_CODE:
                     yield cp
                 else:
@@ -724,9 +725,9 @@ class PagingDecoder(object):
 def unpackbyte(b):
    """
    Given a one-byte long byte string, returns an integer. Equivalent
-   to struct.unpack("B", b)
+   to py3compat.unpack("B", b)
    """
-   (ret,) = struct.unpack("B", b)
+   (ret,) = py3compat.unpack("B", b)
    return ret
 
 
@@ -887,9 +888,9 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 
 import sys
 try:
-    from cStringIO import StringIO
+    from io import StringIO
 except ImportError:
-    from StringIO import StringIO
+    from io import StringIO
 
 
 ##  LZWDecoder
@@ -934,7 +935,7 @@ class LZWDecoder(object):
     def feed(self, code):
         x = ''
         if code == 256:
-            self.table = [ chr(c) for c in xrange(256) ] # 0-255
+            self.table = [ chr(c) for c in range(256) ] # 0-255
             self.table.append(None) # 256
             self.table.append(None) # 257
             self.prevbuf = ''
@@ -969,8 +970,8 @@ class LZWDecoder(object):
             x = self.feed(code)
             yield x
             if self.debug:
-                print >>sys.stderr, ('nbits=%d, code=%d, output=%r, table=%r' %
-                                     (self.nbits, code, x, self.table[258:]))
+                print(('nbits=%d, code=%d, output=%r, table=%r' %
+                                     (self.nbits, code, x, self.table[258:])), file=sys.stderr)
         return
 
 

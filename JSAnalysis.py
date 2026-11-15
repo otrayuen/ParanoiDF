@@ -59,7 +59,7 @@ except:
 
 errorsFile = 'errors.txt'
 newLine = os.linesep         
-reJSscript = '<script[^>]*?contentType\s*?=\s*?[\'"]application/x-javascript[\'"][^>]*?>(.*?)</script>'
+reJSscript = '<script[^>]*?contentType\\s*?=\\s*?[\'"]application/x-javascript[\'"][^>]*?>(.*?)</script>'
 preDefinedCode = 'var app = this;'
 
 def analyseJS(code, context = None, manualAnalysis = False):
@@ -114,7 +114,7 @@ def analyseJS(code, context = None, manualAnalysis = False):
                     break
             
             if code != '':
-                escapedVars = re.findall('(\w*?)\s*?=\s*?(unescape\((.*?)\))', code, re.DOTALL)
+                escapedVars = re.findall('(\\w*?)\\s*?=\\s*?(unescape\\((.*?)\\))', code, re.DOTALL)
                 for var in escapedVars:
                     bytes = var[2]
                     if bytes.find('+') != -1 or bytes.find('%') == -1:
@@ -169,7 +169,7 @@ def getVarContent(jsCode, varContent):
             clearBytes += part[1:-1]
         else:
             part = escapeString(part)
-            varContent = re.findall(part + '\s*?=\s*?(.*?)[,;]', jsCode, re.DOTALL)
+            varContent = re.findall(part + '\\s*?=\\s*?(.*?)[,;]', jsCode, re.DOTALL)
             if varContent != []:
                 clearBytes += getVarContent(jsCode, varContent[0])
     return clearBytes
@@ -218,20 +218,20 @@ def searchObfuscatedFunctions(jsCode, function):
     '''
     obfuscatedFunctionsInfo = []
     if jsCode != None:
-        match = re.findall('\W('+function+'\s{0,5}?\((.*?)\)\s{0,5}?;)', jsCode, re.DOTALL)
+        match = re.findall('\\W('+function+'\\s{0,5}?\\((.*?)\\)\\s{0,5}?;)', jsCode, re.DOTALL)
         if match != []:
            for m in match:
               if re.findall('return',m[1],re.IGNORECASE) != []:
                  obfuscatedFunctionsInfo.append([function,m,True])
               else:
                  obfuscatedFunctionsInfo.append([function,m,False])
-        obfuscatedFunctions = re.findall('\s*?((\w*?)\s*?=\s*?'+function+')\s*?;', jsCode, re.DOTALL)
+        obfuscatedFunctions = re.findall('\\s*?((\\w*?)\\s*?=\\s*?'+function+')\\s*?;', jsCode, re.DOTALL)
         for obfuscatedFunction in obfuscatedFunctions:
            obfuscatedElement = obfuscatedFunction[1]
            obfuscatedFunctionsInfo += searchObfuscatedFunctions(jsCode, obfuscatedElement)
     return obfuscatedFunctionsInfo
 
-def unescape(escapedBytes, unicode = True):
+def unescape(escapedBytes, str = True):
     '''
         This method unescapes the given string
         
@@ -240,13 +240,13 @@ def unescape(escapedBytes, unicode = True):
     '''
     #TODO: modify to accept a list of escaped strings?
     unescapedBytes = ''
-    if unicode:
+    if str:
         unicodePadding = '\x00'
     else:
         unicodePadding = ''
     try:
-        if escapedBytes.lower().find('%u') != -1 or escapedBytes.lower().find('\u') != -1 or escapedBytes.find('%') != -1:
-            if escapedBytes.lower().find('\u') != -1:
+        if escapedBytes.lower().find('%u') != -1 or escapedBytes.lower().find('\\u') != -1 or escapedBytes.find('%') != -1:
+            if escapedBytes.lower().find('\\u') != -1:
                 splitBytes = escapedBytes.split('\\')
             else:
                 splitBytes = escapedBytes.split('%')

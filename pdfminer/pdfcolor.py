@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-from psparser import LIT
+from .psparser import LIT
 
 
 ##  PDFColorSpace
@@ -31,4 +31,4 @@ PREDEFINED_COLORSPACE = dict(
         'Separation': 1,
         'Indexed': 1,
         'Pattern': 1,
-    }.iteritems())
+    }.items())
