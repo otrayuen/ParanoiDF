@@ -254,7 +254,7 @@ def asciiHexEncode(stream):
         @return: A tuple (status,statusContent), where statusContent is the encoded PDF stream in case status = 0 or an error in case status = -1
     '''
     try:
-        encodedStream = stream.encode('hex')    
+        encodedStream = py3compat.hexlify(stream)    
     except:
         return (-1,'Error in hexadecimal conversion')
     return (0,encodedStream)

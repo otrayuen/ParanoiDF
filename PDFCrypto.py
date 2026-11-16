@@ -46,6 +46,20 @@ warnings.filterwarnings("ignore")
 
 paddingString = '\x28\xBF\x4E\x5E\x4E\x75\x8A\x41\x64\x00\x4E\x56\xFF\xFA\x01\x08\x2E\x2E\x00\xB6\xD0\x68\x3E\x80\x2F\x0C\xA9\xFE\x64\x53\x69\x7A'
 
+def revision5Password(password):
+    '''UTF-8 password truncated to 127 bytes, as Latin-1 text.
+
+    Revision 5 (AES-256) hashes that byte string with the salts from the
+    encryption dictionary. Keeping it as Latin-1 text lets it concatenate
+    with those salts, which the parser also stores as Latin-1 text.
+    '''
+    if isinstance(password, bytes):
+        raw = password[:127]
+    else:
+        raw = password.encode('utf-8')[:127]
+    return raw.decode('latin-1')
+
+
 def computeEncryptionKey(password, dictOwnerPass, dictUserPass, dictOE, dictUE, fileID, pElement, dictKeyLength = 128, revision = 3, encryptMetadata = False, passwordType = None):
     '''
         Compute an encryption key to encrypt/decrypt the PDF file
@@ -84,16 +98,17 @@ def computeEncryptionKey(password, dictOwnerPass, dictUserPass, dictOE, dictUE, 
             key = key[:5]
         return (0, key)
     else:
+        password = revision5Password(password)
         if passwordType == 'USER':
-            password = password.encode('utf-8')[:127]
             kSalt = dictUserPass[40:48]
             intermediateKey = py3compat.sha256(password + kSalt).digest()
             ret = aes.decryptData('\0'*16+dictUE, intermediateKey)
         elif passwordType == 'OWNER':
-            password = password.encode('utf-8')[:127]
             kSalt = dictOwnerPass[40:48]
             intermediateKey = py3compat.sha256(password + kSalt + dictUserPass).digest()
             ret = aes.decryptData('\0'*16+dictOE, intermediateKey)
+        else:
+            return (-1, 'Decryption error: Password type not specified!!')
         return ret
 
 def computeObjectKey(id, generationNum, encryptionKey, keyLengthBytes, algorithm = 'RC4'):
@@ -212,7 +227,7 @@ def isUserPass(password, computedUserPass, dictU, revision):
     '''
     if revision == 5:
         vSalt = dictU[32:40]
-        inputHash = py3compat.sha256(password + vSalt).digest()
+        inputHash = py3compat.sha256(revision5Password(password) + vSalt).digest()
         if inputHash == dictU[:32]:
             return True
         else:
@@ -242,7 +257,7 @@ def isOwnerPass(password, dictO, dictU, computedUserPass, keyLength, revision):
     '''
     if revision == 5:
         vSalt = dictO[32:40]
-        inputHash = py3compat.sha256(password + vSalt + dictU).digest()
+        inputHash = py3compat.sha256(revision5Password(password) + vSalt + dictU).digest()
         if inputHash == dictO[:32]:
             return True
         else:

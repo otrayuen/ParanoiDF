@@ -7,6 +7,7 @@ below instead of hashlib, zlib, and struct so those stdlib functions can keep
 returning bytes for other libraries.
 '''
 
+import binascii
 import hashlib
 import struct
 import zlib
@@ -71,6 +72,18 @@ def to_str(data):
     if isinstance(data, (bytes, bytearray)):
         return bytes(data).decode('latin-1')
     return data
+
+
+def hexlify(data):
+    '''Python 2 ``str.encode('hex')``: lowercase hex digits.'''
+    return binascii.hexlify(to_bytes(data)).decode('ascii')
+
+
+def unhexlify(data):
+    '''Python 2 ``str.decode('hex')``: raw bytes as Latin-1 text.'''
+    if isinstance(data, str):
+        data = data.encode('ascii')
+    return to_str(binascii.unhexlify(data))
 
 
 class _Hash(object):

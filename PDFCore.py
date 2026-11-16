@@ -744,10 +744,10 @@ class PDFHexString (PDFObject) :
                     tmpValue = self.rawValue
                     if len(tmpValue) % 2 != 0:
                         tmpValue += '0'
-                    self.value = tmpValue.decode('hex')
+                    self.value = py3compat.unhexlify(tmpValue)
                 else:
                     # New decoded value
-                    self.rawValue = self.value.encode('hex')
+                    self.rawValue = py3compat.hexlify(self.value)
                 self.encryptedValue = self.value
             except:
                 errorMessage = 'Error in hexadecimal conversion'
@@ -775,7 +775,7 @@ class PDFHexString (PDFObject) :
             self.encryptionKey = password
         try:
             self.encryptedValue = RC4(self.value,self.encryptionKey)
-            self.rawValue = self.encryptedValue.encode('hex')
+            self.rawValue = py3compat.hexlify(self.encryptedValue)
         except:
             errorMessage = 'Error encrypting with RC4'
             self.addError(errorMessage)
@@ -967,7 +967,7 @@ class PDFArray (PDFObject) :
                     self.unescapedBytes += element.getUnescapedBytes()
                     self.urlsFound += element.getURLs()
                 if element.isFaulty():
-                    for error in valueObject.getErrors():
+                    for error in element.getErrors():
                         self.addError('Children element contains errors: ' + error)
                 if type in ['string','hexstring','array','dictionary'] and self.encrypted and not decrypt:
                     ret = element.encrypt(self.encryptionKey)
@@ -1721,7 +1721,7 @@ class PDFStream (PDFDictionary) :
                 self.unescapedBytes = list(set(self.unescapedBytes + valueElement.getUnescapedBytes()))
                 self.urlsFound = list(set(self.urlsFound + valueElement.getURLs()))
             if valueElement.isFaulty():
-                for error in valueObject.getErrors():
+                for error in valueElement.getErrors():
                     self.addError('Children element contains errors: ' + error)
             if keys[i] in self.rawNames:
                 rawName = self.rawNames[keys[i]]
@@ -7363,15 +7363,15 @@ class PDFParser :
                         if bytesPerField[0] == 0:
                             f1 = 1
                         else:
-                            f1 = int(entryBytes[:bytesPerField[0]].encode('hex'),16)
+                            f1 = int(py3compat.hexlify(entryBytes[:bytesPerField[0]]),16)
                         if bytesPerField[1] == 0:
                             f2 = 0
                         else:
-                            f2 = int(entryBytes[bytesPerField[0]:bytesPerField[0]+bytesPerField[1]].encode('hex'),16)
+                            f2 = int(py3compat.hexlify(entryBytes[bytesPerField[0]:bytesPerField[0]+bytesPerField[1]]),16)
                         if bytesPerField[2] == 0:
                             f3 = 0
                         else:
-                            f3 = int(entryBytes[bytesPerField[0]+bytesPerField[1]:].encode('hex'),16)
+                            f3 = int(py3compat.hexlify(entryBytes[bytesPerField[0]+bytesPerField[1]:]),16)
                     except:
                         errorMessage = 'Error in hexadecimal conversion'
                         if isForceMode:
