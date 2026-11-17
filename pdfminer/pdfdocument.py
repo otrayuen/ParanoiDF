@@ -1,11 +1,7 @@
 #!/usr/bin/env python
 import sys
 import re
-import struct
-try:
-    import hashlib as md5
-except ImportError:
-    import md5
+import py3compat
 from .psparser import PSEOF
 from .psparser import literal_name
 from .psparser import LIT, KWD, STRICT
@@ -358,9 +354,9 @@ class PDFDocument(object):
         self.is_extractable = bool(P & 16)
         # Algorithm 3.2
         password = (password+self.PASSWORD_PADDING)[:32]  # 1
-        hash = md5.md5(password)  # 2
+        hash = py3compat.md5(password)  # 2
         hash.update(O)  # 3
-        hash.update(struct.pack('<l', P))  # 4
+        hash.update(py3compat.pack('<l', P))  # 4
         hash.update(docid[0])  # 5
         if 4 <= R:
             # 6
@@ -368,14 +364,14 @@ class PDFDocument(object):
         if 3 <= R:
             # 8
             for _ in range(50):
-                hash = md5.md5(hash.digest()[:length//8])
+                hash = py3compat.md5(hash.digest()[:length//8])
         key = hash.digest()[:length//8]
         if R == 2:
             # Algorithm 3.4
             u1 = Arcfour(key).process(self.PASSWORD_PADDING)
         elif R == 3:
             # Algorithm 3.5
-            hash = md5.md5(self.PASSWORD_PADDING)  # 2
+            hash = py3compat.md5(self.PASSWORD_PADDING)  # 2
             hash.update(docid[0])  # 3
             x = Arcfour(key).process(hash.digest()[:16])  # 4
             for i in range(1, 19+1):
@@ -393,8 +389,8 @@ class PDFDocument(object):
         return
 
     def decrypt_rc4(self, objid, genno, data):
-        key = self.decrypt_key + struct.pack('<L', objid)[:3]+struct.pack('<L', genno)[:2]
-        hash = md5.md5(key)
+        key = self.decrypt_key + py3compat.pack('<L', objid)[:3]+py3compat.pack('<L', genno)[:2]
+        hash = py3compat.md5(key)
         key = hash.digest()[:min(len(key), 16)]
         return Arcfour(key).process(data)
 

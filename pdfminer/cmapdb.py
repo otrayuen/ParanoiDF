@@ -25,6 +25,11 @@ from .encodingdb import name2unicode
 from .utils import choplist, nunpack
 
 
+def _be_bytes(n):
+    '''Four big-endian bytes as Latin-1 text, matching the parser's strings.'''
+    return struct.pack('>L', n).decode('latin-1')
+
+
 class CMapError(Exception):
     pass
 
@@ -98,7 +103,8 @@ class IdentityCMap(object):
     def decode(self, code):
         n = len(code)//2
         if n:
-            return struct.unpack('>%dH' % n, code)
+            raw = code.encode('latin-1') if isinstance(code, str) else code
+            return struct.unpack('>%dH' % n, raw)
         else:
             return ()
 
@@ -181,8 +187,8 @@ class FileUnicodeMap(UnicodeMap):
             # Interpret as an Adobe glyph name.
             self.cid2unichr[cid] = name2unicode(code.name)
         elif isinstance(code, str):
-            # Interpret as UTF-16BE.
-            self.cid2unichr[cid] = str(code, 'UTF-16BE', 'ignore')
+            # Interpret as UTF-16BE. The parser keeps raw bytes as Latin-1 text.
+            self.cid2unichr[cid] = code.encode('latin-1').decode('utf-16-be', 'ignore')
         elif isinstance(code, int):
             self.cid2unichr[cid] = chr(code)
         else:
@@ -353,7 +359,7 @@ class CMapParser(PSStackParser):
                 vlen = len(svar)
                 #assert s1 <= e1
                 for i in range(e1-s1+1):
-                    x = sprefix+struct.pack('>L', s1+i)[-vlen:]
+                    x = sprefix+_be_bytes(s1+i)[-vlen:]
                     self.cmap.add_code2cid(x, cid+i)
             return
 
@@ -388,7 +394,7 @@ class CMapParser(PSStackParser):
                     prefix = code[:-4]
                     vlen = len(var)
                     for i in range(e1-s1+1):
-                        x = prefix+struct.pack('>L', base+i)[-vlen:]
+                        x = prefix+_be_bytes(base+i)[-vlen:]
                         self.cmap.add_cid2unichr(s1+i, x)
             return
 

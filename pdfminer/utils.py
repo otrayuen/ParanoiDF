@@ -171,14 +171,15 @@ def nunpack(s, default=0):
     l = len(s)
     if not l:
         return default
-    elif l == 1:
-        return ord(s)
+    raw = s.encode('latin-1') if isinstance(s, str) else s
+    if l == 1:
+        return raw[0]
     elif l == 2:
-        return struct.unpack('>H', s)[0]
+        return struct.unpack('>H', raw)[0]
     elif l == 3:
-        return struct.unpack('>L', '\x00'+s)[0]
+        return struct.unpack('>L', b'\x00'+raw)[0]
     elif l == 4:
-        return struct.unpack('>L', s)[0]
+        return struct.unpack('>L', raw)[0]
     else:
         raise TypeError('invalid length: %d' % l)
 
@@ -223,7 +224,7 @@ PDFDocEncoding = ''.join(chr(x) for x in (
 def decode_text(s):
     """Decodes a PDFDocEncoding string to Unicode."""
     if s.startswith('\xfe\xff'):
-        return str(s[2:], 'utf-16be', 'ignore')
+        return s[2:].encode('latin-1').decode('utf-16-be', 'ignore')
     else:
         return ''.join(PDFDocEncoding[ord(c)] for c in s)
 

@@ -36,7 +36,7 @@ def ascii85decode(data):
             n += 1
             b = b*85+(ord(c)-33)
             if n == 5:
-                out += struct.pack('>L', b)
+                out += struct.pack('>L', b).decode('latin-1')
                 n = b = 0
         elif c == 'z':
             assert n == 0
@@ -45,7 +45,7 @@ def ascii85decode(data):
             if n:
                 for _ in range(5-n):
                     b = b*85+84
-                out += struct.pack('>L', b)[:n-1]
+                out += struct.pack('>L', b).decode('latin-1')[:n-1]
             break
     return out
 
