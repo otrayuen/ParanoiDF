@@ -616,7 +616,9 @@ class LTLayoutContainer(LTContainer):
             for j in range(i+1, len(boxes)):
                 obj2 = boxes[j]
                 dists.append((0, dist(obj1, obj2), obj1, obj2))
-        dists.sort()
+        # Sort by (already-separated, distance) only. The box objects have no
+        # ordering, and Python 3 raises TypeError when two pairs tie.
+        dists.sort(key=lambda item: (item[0], item[1]))
         plane = Plane(self.bbox)
         plane.extend(boxes)
         while dists:
@@ -635,7 +637,7 @@ class LTLayoutContainer(LTContainer):
             dists = [n for n in dists if n[2] in plane._objs and n[3] in plane._objs]
             for other in plane:
                 dists.append((0, dist(group, other), group, other))
-            dists.sort()
+            dists.sort(key=lambda item: (item[0], item[1]))
             plane.add(group)
         assert len(plane) == 1
         return list(plane)
