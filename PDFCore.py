@@ -6744,7 +6744,10 @@ class PDFParser :
                     sys.exit(errorMessage)
         pdfFile.setUpdates(len(self.fileParts) - 1)
         
-        # Getting the body, cross reference table and trailer of each part of the file
+        # Getting the body, cross reference table and trailer of each part of the file.
+        # partStart is the file offset of this %%EOF part. startxref numbers are
+        # absolute, so the section split has to subtract it.
+        partStart = 0
         for i in range(len(self.fileParts)):
             bodyOffset = 0
             xrefOffset = 0
@@ -6771,7 +6774,7 @@ class PDFParser :
                 bodyOffset = len(self.fileParts[i-1])
                 
             # Getting the content for each section
-            bodyContent,xrefContent,trailerContent = self.parsePDFSections(content,forceMode,looseMode)
+            bodyContent,xrefContent,trailerContent = self.parsePDFSections(content,forceMode,looseMode,partStart)
             if xrefContent != None:    
                 xrefOffset = bodyOffset + len(bodyContent)
                 trailerOffset = xrefOffset + len(xrefContent)
@@ -6929,18 +6932,20 @@ class PDFParser :
                             fileId = fileIdElements[1].getValue()
                             pdfFile.setFileId(fileId)
             pdfFile.addTrailer([trailer, streamTrailer])
+            partStart += len(content)
         if pdfFile.isEncrypted() and pdfFile.getEncryptDict() != None:
             ret = pdfFile.decrypt()
             if ret[0] == -1:
                 pdfFile.addError(ret[1])
         return (0,pdfFile)
 
-    def parsePDFSections(self, content, forceMode = False, looseMode = False):
+    def parsePDFSections(self, content, forceMode = False, looseMode = False, partStart = 0):
         '''
             Method to parse the different sections of a version of a PDF document.
             @param content The raw content of the version of the PDF document.
             @param forceMode Boolean to specify if ignore errors or not. Default value: False.
             @param looseMode Boolean to set the loose mode when parsing objects. Default value: False.
+            @param partStart File offset where this %%EOF part begins. startxref values are absolute.
             @return An array with the different sections found: body, trailer and cross reference table
         '''
         threeSections = False
@@ -6949,6 +6954,16 @@ class PDFParser :
         trailerContent = None
         
         global pdfFile
+        # Page text often contains the words "xref" and "trailer". The first
+        # match of either word is not the cross-reference table, and splitting
+        # there drops every object after that word. The offset after the last
+        # startxref is the real table. A line that is only "xref" is the fallback
+        # when that offset points outside this part.
+        located = self._splitAtXrefKeyword(content, self._xrefOffsetInPart(content, partStart))
+        if located == None:
+            located = self._splitAtXrefKeyword(content, self._lastLineXref(content))
+        if located != None:
+            return located
         indexTrailer = content.find('trailer')
         if indexTrailer != -1:
             restContent = content[:indexTrailer]
@@ -6981,6 +6996,60 @@ class PDFParser :
             return [bodyContent,xrefContent,trailerContent]
         
         return [content,xrefContent,trailerContent]
+
+    def _xrefOffsetInPart(self, content, partStart):
+        '''File offset of the classic xref table, relative to this part, or -1.'''
+        start = content.rfind('startxref')
+        if start == -1:
+            return -1
+        match = re.match('startxref\\s+(\\d+)', content[start:])
+        if match == None:
+            return -1
+        relative = int(match.group(1)) - partStart
+        if relative < 0 or relative + 4 > len(content):
+            return -1
+        if content[relative:relative+4] != 'xref':
+            return -1
+        return relative
+
+    def _lastLineXref(self, content):
+        '''Offset of the last line whose only token is the xref keyword, or -1.'''
+        index = len(content)
+        while True:
+            index = content.rfind('xref', 0, index)
+            if index == -1:
+                return -1
+            atLineStart = index == 0 or content[index-1] in '\r\n'
+            after = content[index+4:index+5]
+            if atLineStart and after in '\r\n':
+                return index
+
+    def _splitAtXrefKeyword(self, content, xrefIndex):
+        '''Split body, xref table, and trailer when xrefIndex starts a real table.'''
+        if xrefIndex == None or xrefIndex < 0:
+            return None
+        rest = content[xrefIndex:]
+        trailerAt = -1
+        searchFrom = 0
+        while True:
+            found = rest.find('trailer', searchFrom)
+            if found == -1:
+                break
+            atLineStart = found == 0 or rest[found-1] in '\r\n'
+            after = rest[found+7:found+8]
+            if atLineStart and after in '\r\n':
+                trailerAt = found
+                break
+            searchFrom = found + 7
+        if trailerAt == -1:
+            return None
+        auxTrailer = rest[trailerAt:]
+        indexEOF = auxTrailer.find('%%EOF')
+        if indexEOF == -1:
+            trailerContent = auxTrailer
+        else:
+            trailerContent = auxTrailer[:indexEOF+5]
+        return [content[:xrefIndex], rest[:trailerAt], trailerContent]
     
     def createPDFIndirectObject (self, rawIndirectObject, forceMode = False, looseMode = False) :
         '''
