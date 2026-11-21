@@ -6626,6 +6626,169 @@ class PDFFile :
         pass
 
 
+def _skip_literal_string(content, index):
+    '''Index of the character after a PDF literal string that starts at index.'''
+    index += 1
+    depth = 1
+    limit = len(content)
+    while index < limit and depth:
+        char = content[index]
+        if char == '\\':
+            index += 2
+            continue
+        if char == '(':
+            depth += 1
+        elif char == ')':
+            depth -= 1
+        index += 1
+    return index
+
+
+def _skip_hex_string(content, index):
+    '''Index of the character after a PDF hex string that starts at index.'''
+    end = content.find('>', index + 1)
+    if end == -1:
+        return len(content)
+    return end + 1
+
+
+def _keyword_at(content, index, word):
+    '''True when word is a PDF keyword, not the middle of a name or another token.'''
+    if not content.startswith(word, index):
+        return False
+    if index > 0 and content[index - 1] not in ' \t\r\n\x00\x0c':
+        return False
+    after = index + len(word)
+    if after < len(content) and content[after] not in ' \t\r\n\x00\x0c()<>[]{}/%':
+        return False
+    return True
+
+
+def _stream_keyword_at(content, index):
+    '''True when index is the stream keyword that follows an object dictionary.'''
+    if not content.startswith('stream', index):
+        return False
+    if index > 0 and content[index - 1] not in ' \t\r\n\x00\x0c>':
+        return False
+    after = index + len('stream')
+    if after < len(content) and content[after] not in ' \t\r\n\x00\x0c':
+        return False
+    return True
+
+
+def _preceded_by_dict_close(content, start, keyword):
+    '''True when only whitespace sits between >> and keyword.'''
+    index = keyword - 1
+    while index >= start and content[index] in ' \t\r\n\x00\x0c':
+        index -= 1
+    return index > start and content[index - 1:index + 1] == '>>'
+
+
+def _direct_stream_length(dictionary):
+    '''Direct /Length integer, ignoring /Length1 and indirect /Length N 0 R.'''
+    found = None
+    index = 0
+    limit = len(dictionary)
+    while index < limit:
+        char = dictionary[index]
+        if char == '(':
+            index = _skip_literal_string(dictionary, index)
+            continue
+        if char == '<':
+            if dictionary.startswith('<<', index):
+                index += 2
+                continue
+            index = _skip_hex_string(dictionary, index)
+            continue
+        if char == '%':
+            newline = dictionary.find('\n', index)
+            index = limit if newline == -1 else newline + 1
+            continue
+        if dictionary.startswith('/Length', index):
+            name_end = index + len('/Length')
+            if name_end < limit and dictionary[name_end] not in ' \t\r\n\x00\x0c()<>[]{}/%':
+                index += 1
+                continue
+            match = re.match(r'/Length\s+(\d+)\b', dictionary[index:])
+            if match:
+                after = dictionary[index + match.end():]
+                if re.match(r'\s+\d+\s+R\b', after) is None:
+                    found = int(match.group(1))
+                index += match.end()
+                continue
+        index += 1
+    return found
+
+
+def _after_stream_keyword(content, keyword_end):
+    '''Index of the first stream-data byte after the EOL that follows stream.'''
+    if content.startswith('\r\n', keyword_end):
+        return keyword_end + 2
+    if keyword_end < len(content) and content[keyword_end] in '\r\n':
+        return keyword_end + 1
+    return keyword_end
+
+
+def _line_keyword(content, start, word):
+    '''Index of word beginning a line, or -1.'''
+    index = start
+    while True:
+        found = content.find(word, index)
+        if found == -1:
+            return -1
+        line_end = found - 1
+        while line_end >= start and content[line_end] in ' \t':
+            line_end -= 1
+        if line_end < start or content[line_end] in '\r\n':
+            after = found + len(word)
+            if after >= len(content) or content[after] in ' \t\r\n\x00\x0c()<>[]{}/%':
+                return found
+        index = found + 1
+
+
+def _end_of_indirect_object(content, body_start):
+    '''Index just past the endobj that closes the object whose body starts here.
+
+    Literal strings, comments, and the bytes declared by a direct /Length are
+    not searched. Returns -1 when no terminator is found.
+    '''
+    index = body_start
+    limit = len(content)
+    while index < limit:
+        char = content[index]
+        if char == '%':
+            newline = content.find('\n', index)
+            index = limit if newline == -1 else newline + 1
+            continue
+        if char == '(':
+            index = _skip_literal_string(content, index)
+            continue
+        if char == '<':
+            if content.startswith('<<', index):
+                index += 2
+                continue
+            index = _skip_hex_string(content, index)
+            continue
+        if _keyword_at(content, index, 'endobj'):
+            return index + len('endobj')
+        if _stream_keyword_at(content, index) and _preceded_by_dict_close(content, body_start, index):
+            length = _direct_stream_length(content[body_start:index])
+            data_start = _after_stream_keyword(content, index + len('stream'))
+            if length is not None:
+                data_end = data_start + length
+                if data_end > limit:
+                    return -1
+                index = data_end
+                continue
+            endstream = _line_keyword(content, data_start, 'endstream')
+            if endstream == -1:
+                return -1
+            index = endstream + len('endstream')
+            continue
+        index += 1
+    return -1
+
+
 class PDFParser :
     def __init__(self) :
         self.commentChar = '%'
@@ -7536,8 +7699,19 @@ class PDFParser :
         if not isinstance(content,str):
             return matchingObjects
         if not looseMode:
-            regExp = re.compile('((\\d{1,10}\\s\\d{1,10}\\sobj).*?endobj)',re.DOTALL)
-            matchingObjects = regExp.findall(content)
+            # A non-greedy search stops at the first endobj. That word is a
+            # legal part of a string or of a stream, so the rest of the object
+            # (the JavaScript after it, the rest of an embedded file) was dropped.
+            headerExp = re.compile('(\\d{1,10}\\s\\d{1,10}\\sobj)')
+            cursor = 0
+            for header in headerExp.finditer(content):
+                if header.start() < cursor:
+                    continue
+                end = _end_of_indirect_object(content, header.end())
+                if end == -1:
+                    continue
+                matchingObjects.append((content[header.start():end], header.group(1)))
+                cursor = end
         else:
             regExp = re.compile('((\\d{1,10}\\s\\d{1,10}\\sobj).*?)\\s\\d{1,10}\\s\\d{1,10}\\sobj',re.DOTALL)
             matchingObjectsAux = regExp.findall(content)
