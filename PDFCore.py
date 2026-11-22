@@ -6626,6 +6626,205 @@ class PDFFile :
         pass
 
 
+def _skip_literal_string(content, index):
+    '''Index of the character after a PDF literal string that starts at index.'''
+    index += 1
+    depth = 1
+    limit = len(content)
+    while index < limit and depth:
+        char = content[index]
+        if char == '\\':
+            index += 2
+            continue
+        if char == '(':
+            depth += 1
+        elif char == ')':
+            depth -= 1
+        index += 1
+    return index
+
+
+def _skip_hex_string(content, index):
+    '''Index of the character after a PDF hex string that starts at index.'''
+    end = content.find('>', index + 1)
+    if end == -1:
+        return len(content)
+    return end + 1
+
+
+def _skip_to_eol(content, index):
+    '''Index just past the end-of-line that ends the line containing index.'''
+    limit = len(content)
+    while index < limit and content[index] not in '\r\n':
+        index += 1
+    if content.startswith('\r\n', index):
+        return index + 2
+    if index < limit:
+        return index + 1
+    return index
+
+
+def _eof_marker_at(content, index):
+    '''True when index is a %%EOF that ends an update, not text in the middle of a line.'''
+    if not content.startswith('%%EOF', index):
+        return False
+    line = index - 1
+    while line >= 0 and content[line] in ' \t':
+        line -= 1
+    if line >= 0 and content[line] not in '\r\n':
+        return False
+    after = index + 5
+    limit = len(content)
+    while after < limit and content[after] in ' \t':
+        after += 1
+    return after >= limit or content[after] in '\r\n'
+
+
+def _stream_keyword_at(content, index):
+    '''True when index is the stream keyword that follows an object dictionary.'''
+    if not content.startswith('stream', index):
+        return False
+    if index > 0 and content[index - 1] not in ' \t\r\n\x00\x0c>':
+        return False
+    after = index + len('stream')
+    if after < len(content) and content[after] not in ' \t\r\n\x00\x0c':
+        return False
+    return True
+
+
+def _preceded_by_dict_close(content, keyword):
+    '''True when only whitespace sits between >> and keyword.'''
+    index = keyword - 1
+    while index >= 0 and content[index] in ' \t\r\n\x00\x0c':
+        index -= 1
+    return index >= 1 and content[index - 1:index + 1] == '>>'
+
+
+def _direct_stream_length(dictionary):
+    '''Direct /Length integer, ignoring /Length1 and indirect /Length N 0 R.'''
+    if not dictionary:
+        return None
+    found = None
+    index = 0
+    limit = len(dictionary)
+    while index < limit:
+        char = dictionary[index]
+        if char == '(':
+            index = _skip_literal_string(dictionary, index)
+            continue
+        if char == '<':
+            if dictionary.startswith('<<', index):
+                index += 2
+                continue
+            index = _skip_hex_string(dictionary, index)
+            continue
+        if char == '%':
+            index = _skip_to_eol(dictionary, index)
+            continue
+        if dictionary.startswith('/Length', index):
+            name_end = index + len('/Length')
+            if name_end < limit and dictionary[name_end] not in ' \t\r\n\x00\x0c()<>[]{}/%':
+                index += 1
+                continue
+            match = re.match(r'/Length\s+(\d+)\b', dictionary[index:])
+            if match:
+                after = dictionary[index + match.end():]
+                if re.match(r'\s+\d+\s+R\b', after) is None:
+                    found = int(match.group(1))
+                index += match.end()
+                continue
+        index += 1
+    return found
+
+
+def _length_before_stream(content, stream_index):
+    '''/Length of the dictionary that ends at this stream keyword.'''
+    window_start = max(0, stream_index - 8192)
+    previous = window_start
+    for marker in ('endobj', 'endstream'):
+        found = content.rfind(marker, window_start, stream_index)
+        if found > previous:
+            previous = found + len(marker)
+    return _direct_stream_length(content[previous:stream_index])
+
+
+def _after_stream_keyword(content, keyword_end):
+    '''Index of the first stream-data byte after the EOL that follows stream.'''
+    if content.startswith('\r\n', keyword_end):
+        return keyword_end + 2
+    if keyword_end < len(content) and content[keyword_end] in '\r\n':
+        return keyword_end + 1
+    return keyword_end
+
+
+def _line_keyword(content, start, word):
+    '''Index of word beginning a line, or -1.'''
+    index = start
+    while True:
+        found = content.find(word, index)
+        if found == -1:
+            return -1
+        line_end = found - 1
+        while line_end >= start and content[line_end] in ' \t':
+            line_end -= 1
+        if line_end < start or content[line_end] in '\r\n':
+            after = found + len(word)
+            if after >= len(content) or content[after] in ' \t\r\n\x00\x0c()<>[]{}/%':
+                return found
+        index = found + 1
+
+
+def _next_eof_end(content):
+    '''Index just past the next real %%EOF and the end-of-line after it.
+
+    A marker inside a literal string, a hex string, or a stream body ends
+    nothing: those bytes are file data. Returns -1 when this part has no
+    end-of-file marker.
+    '''
+    index = 0
+    limit = len(content)
+    while index < limit:
+        char = content[index]
+        if char == '%':
+            if _eof_marker_at(content, index):
+                end = index + 5
+                while end < limit and content[end] in ' \t':
+                    end += 1
+                if content.startswith('\r\n', end):
+                    return end + 2
+                if end < limit and content[end] in '\r\n':
+                    return end + 1
+                return end
+            index = _skip_to_eol(content, index)
+            continue
+        if char == '(':
+            index = _skip_literal_string(content, index)
+            continue
+        if char == '<':
+            if content.startswith('<<', index):
+                index += 2
+                continue
+            index = _skip_hex_string(content, index)
+            continue
+        if _stream_keyword_at(content, index) and _preceded_by_dict_close(content, index):
+            length = _length_before_stream(content, index)
+            data_start = _after_stream_keyword(content, index + len('stream'))
+            if length is not None:
+                data_end = data_start + length
+                if data_end <= index:
+                    index += 1
+                    continue
+                index = min(data_end, limit)
+                continue
+            endstream = _line_keyword(content, data_start, 'endstream')
+            if endstream == -1:
+                return -1
+            index = endstream + len('endstream')
+            continue
+        index += 1
+    return -1
+
+
 class PDFParser :
     def __init__(self) :
         self.commentChar = '%'
@@ -6727,21 +6926,24 @@ class PDFParser :
         pdfFile.setSHA1(py3compat.sha1(fileContent).hexdigest())
         pdfFile.setSHA256(py3compat.sha256(fileContent).hexdigest())
         
-        # Getting the number of updates in the file
-        while fileContent.find('%%EOF') != -1:
-            self.readUntilSymbol(fileContent, '%%EOF')
-            self.readUntilEndOfLine(fileContent)
-            self.fileParts.append(fileContent[:self.charCounter])
-            fileContent = fileContent[self.charCounter:]
+        # Getting the number of updates in the file.
+        # %%EOF inside a string or a stream is file data. Splitting there
+        # makes the first part look like it has no trailer, and the parse
+        # exits before the real catalog is read.
+        while True:
+            eofEnd = _next_eof_end(fileContent)
+            if eofEnd == -1:
+                break
+            self.fileParts.append(fileContent[:eofEnd])
+            fileContent = fileContent[eofEnd:]
             self.charCounter = 0
-        else:
-            if self.fileParts == []:
-                errorMessage = '%%EOF not found'
-                if forceMode:
-                    pdfFile.addError(errorMessage)
-                    self.fileParts.append(fileContent)
-                else:
-                    sys.exit(errorMessage)
+        if self.fileParts == []:
+            errorMessage = '%%EOF not found'
+            if forceMode:
+                pdfFile.addError(errorMessage)
+                self.fileParts.append(fileContent)
+            else:
+                sys.exit(errorMessage)
         pdfFile.setUpdates(len(self.fileParts) - 1)
         
         # Getting the body, cross reference table and trailer of each part of the file
