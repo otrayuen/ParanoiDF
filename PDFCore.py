@@ -6626,6 +6626,70 @@ class PDFFile :
         pass
 
 
+def _skip_literal_string(content, index):
+    '''Index of the character after a PDF literal string that starts at index.'''
+    index += 1
+    depth = 1
+    limit = len(content)
+    while index < limit and depth:
+        char = content[index]
+        if char == '\\':
+            index += 2
+            continue
+        if char == '(':
+            depth += 1
+        elif char == ')':
+            depth -= 1
+        index += 1
+    return index
+
+
+def _skip_hex_string(content, index):
+    '''Index of the character after a PDF hex string that starts at index.'''
+    end = content.find('>', index + 1)
+    if end == -1:
+        return len(content)
+    return end + 1
+
+
+def _direct_stream_length(dictionary):
+    '''Direct /Length integer, ignoring /Length1 and indirect /Length N 0 R.'''
+    if not dictionary:
+        return None
+    found = None
+    index = 0
+    limit = len(dictionary)
+    while index < limit:
+        char = dictionary[index]
+        if char == '(':
+            index = _skip_literal_string(dictionary, index)
+            continue
+        if char == '<':
+            if dictionary.startswith('<<', index):
+                index += 2
+                continue
+            index = _skip_hex_string(dictionary, index)
+            continue
+        if char == '%':
+            newline = dictionary.find('\n', index)
+            index = limit if newline == -1 else newline + 1
+            continue
+        if dictionary.startswith('/Length', index):
+            name_end = index + len('/Length')
+            if name_end < limit and dictionary[name_end] not in ' \t\r\n\x00\x0c()<>[]{}/%':
+                index += 1
+                continue
+            match = re.match(r'/Length\s+(\d+)\b', dictionary[index:])
+            if match:
+                after = dictionary[index + match.end():]
+                if re.match(r'\s+\d+\s+R\b', after) is None:
+                    found = int(match.group(1))
+                index += match.end()
+                continue
+        index += 1
+    return found
+
+
 class PDFParser :
     def __init__(self) :
         self.commentChar = '%'
@@ -7627,12 +7691,30 @@ class PDFParser :
                         self.readUntilEndOfLine(content)
                         self.readSymbol(content, '\r', False)
                         self.readSymbol(content, '\n', False)
-                        ret = self.readUntilSymbol(content, 'endstream')
-                        if ret[0] == -1:
-                            stream = content[self.charCounter:]
+                        dataStart = self.charCounter
+                        length = _direct_stream_length(dictContent)
+                        earlyEnd = -1
+                        dataEnd = None
+                        if length is not None and length >= 0:
+                            dataEnd = dataStart + length
+                            if dataEnd <= len(content):
+                                earlyEnd = content.find('endstream', dataStart, dataEnd)
+                        if earlyEnd != -1:
+                            # /Length runs past this "endstream", so the bytes are
+                            # stream data. Stopping here drops the rest of the
+                            # stream, and a Flate payload that contains the word
+                            # fails to decode.
+                            stream = content[dataStart:dataEnd]
+                            self.charCounter = dataEnd
+                            self.readSpaces(content)
+                            self.readSymbol(content, 'endstream', False)
                         else:
-                            stream = ret[1]
-                            self.readSymbol(content, 'endstream')
+                            ret = self.readUntilSymbol(content, 'endstream')
+                            if ret[0] == -1:
+                                stream = content[self.charCounter:]
+                            else:
+                                stream = ret[1]
+                                self.readSymbol(content, 'endstream')
                         ret = self.createPDFStream(dictContent, stream)
                         if ret[0] == -1:
                             return ret
