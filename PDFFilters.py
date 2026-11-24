@@ -541,23 +541,27 @@ def post_prediction(decodedStream, predictor, columns, colors, bits):
     # http://www.libpng.org/pub/png/spec/1.2/PNG-Filters.html
     # http://www.gnupdf.org/PNG_and_TIFF_Predictors_Filter#TIFF
     elif predictor >= 10 and predictor <= 15:
+        # /Columns is samples per row. The PNG filters walk bytes, so the
+        # row width is the packed sample bytes plus the filter byte.
         bytesPerRow += 1
-        numRows = (len(decodedStream) + bytesPerRow -1) // bytesPerRow
-        numSamplesPerRow = columns + 1
+        numRows = (len(decodedStream) + bytesPerRow - 1) // bytesPerRow
         bytesPerSample = (colors * bits + 7) // 8
-        upRowdata = (0,) * numSamplesPerRow
+        upRowdata = [0] * bytesPerRow
         for row in range(numRows):
             rowdata = [ord(x) for x in decodedStream[(row*bytesPerRow):((row+1)*bytesPerRow)]]
+            if not rowdata:
+                return (-1, 'Truncated predictor row')
             # PNG prediction can vary from row to row
             filterByte = rowdata[0]
             rowdata[0] = 0
-                
+            width = len(rowdata)
+
             if filterByte == 0:
                 # None
                 pass
             elif filterByte == 1:
                 # Sub - 11
-                for i in range(1, numSamplesPerRow):
+                for i in range(1, width):
                     if i < bytesPerSample:
                         prevSample = 0
                     else:
@@ -565,28 +569,28 @@ def post_prediction(decodedStream, predictor, columns, colors, bits):
                     rowdata[i] = (rowdata[i] + prevSample) % 256
             elif filterByte == 2:
                 # Up - 12
-                for i in range(1, numSamplesPerRow):
-                    upSample = upRowdata[i]
+                for i in range(1, width):
+                    upSample = upRowdata[i] if i < len(upRowdata) else 0
                     rowdata[i] = (rowdata[i] + upSample) % 256
             elif filterByte == 3:
                 # Average - 13
-                for i in range(1, numSamplesPerRow):
-                    upSample = upRowdata[i]
+                for i in range(1, width):
+                    upSample = upRowdata[i] if i < len(upRowdata) else 0
                     if i < bytesPerSample:
                         prevSample = 0
                     else:
                         prevSample = rowdata[i-bytesPerSample]
-                    rowdata[i] = (rowdata[i] + ((prevSample+upSample)//2)) % 256                        
+                    rowdata[i] = (rowdata[i] + ((prevSample+upSample)//2)) % 256
             elif filterByte == 4:
                 # Paeth - 14
-                for i in range(1, numSamplesPerRow):
-                    upSample = upRowdata[i]
+                for i in range(1, width):
+                    upSample = upRowdata[i] if i < len(upRowdata) else 0
                     if i < bytesPerSample:
                         prevSample = 0
                         upPrevSample = 0
                     else:
                         prevSample = rowdata[i-bytesPerSample]
-                        upPrevSample = upRowdata[i-bytesPerSample]
+                        upPrevSample = upRowdata[i-bytesPerSample] if i-bytesPerSample < len(upRowdata) else 0
                     p = prevSample + upSample - upPrevSample
                     pa = abs(p - prevSample)
                     pb = abs(p - upSample)
@@ -597,12 +601,12 @@ def post_prediction(decodedStream, predictor, columns, colors, bits):
                         nearest = upSample
                     else:
                         nearest = upPrevSample
-                    rowdata[i] = (rowdata[i] + nearest) % 256                        
+                    rowdata[i] = (rowdata[i] + nearest) % 256
             else:
                 # Optimum - 15
                 #return (-1,'Unsupported predictor')
                 pass
-            upRowdata = rowdata
+            upRowdata = rowdata + [0] * (bytesPerRow - len(rowdata))
             output += (''.join([chr(x) for x in rowdata[1:]]))
         return (0,output)
     else:
