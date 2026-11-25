@@ -7766,6 +7766,18 @@ class PDFParser :
             self.readSpaces(string)
         return (0,self.charCounter - oldCharCounter)
 
+    def _backslash_escaped(self, text, index):
+        '''
+            A parenthesis is escaped only when an odd number of backslashes
+            precedes it. \\\\( is a literal backslash plus a real parenthesis.
+        '''
+        slashes = 0
+        i = index - 1
+        while i >= 0 and text[i] == '\\':
+            slashes += 1
+            i -= 1
+        return slashes % 2 == 1
+
     def readUntilClosingDelim(self, content, delim):
         '''
             Method that reads characters until it finds the closing delimiter
@@ -7798,13 +7810,14 @@ class PDFParser :
                 else:
                     nextChar = newContent[indexChar+1]
                 if char == delim[1] or (char + nextChar) == delim[1]:
-                    if char != ')' or indexChar == 0 or newContent[indexChar-1] != '\\':
-                        return (0,output)
-                    else:
+                    if char == ')' and self._backslash_escaped(newContent, indexChar):
                         output += char
                         indexChar += 1
                         self.charCounter += 1
-                elif (char == '(' and prevChar != '\\') or (char in ['[','<'] and delim[0] != '('):
+                        prevChar = char
+                    else:
+                        return (0,output)
+                elif (char == '(' and not self._backslash_escaped(newContent, indexChar)) or (char in ['[','<'] and delim[0] != '('):
                     if (char + nextChar) != '<<':
                         delimIndex = delimiterChars.index(char)
                         self.charCounter += 1
