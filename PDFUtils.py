@@ -436,6 +436,79 @@ def unescapeString(string):
                         unescapedValue += string[i]
                 i += 1
         return unescapedValue
+
+def decodeLiteralString(string):
+        '''
+        Decode a PDF literal-string body, the characters between the parentheses.
+
+        Escapes are applied in one left-to-right pass. A doubled backslash stays a
+        backslash, so \\\\101 is a backslash followed by the digits 101 and not the
+        letter A. An octal escape is consumed where it starts, so a one- or two-digit
+        escape does not rewrite the digits of a later escape. A backslash immediately
+        before a line break is a line continuation and both are removed.
+
+		@param string: The raw literal-string body
+		@return: The decoded string
+	'''
+        decoded = ''
+        i = 0
+        length = len(string)
+        while i < length:
+                if string[i] == '\\' and i != length - 1:
+                        nxt = string[i+1]
+                        if nxt == '\\':
+                                decoded += '\\'
+                                i += 2
+                                continue
+                        elif nxt == '(' or nxt == ')':
+                                decoded += nxt
+                                i += 2
+                                continue
+                        elif nxt == 'n':
+                                decoded += '\n'
+                                i += 2
+                                continue
+                        elif nxt == 'r':
+                                decoded += '\r'
+                                i += 2
+                                continue
+                        elif nxt == 't':
+                                decoded += '\t'
+                                i += 2
+                                continue
+                        elif nxt == 'b':
+                                decoded += '\b'
+                                i += 2
+                                continue
+                        elif nxt == 'f':
+                                decoded += '\f'
+                                i += 2
+                                continue
+                        elif nxt == '\n':
+                                i += 2
+                                continue
+                        elif nxt == '\r':
+                                i += 2
+                                if i < length and string[i] == '\n':
+                                        i += 1
+                                continue
+                        elif nxt in '01234567':
+                                octal = nxt
+                                i += 2
+                                for _ in range(2):
+                                        if i < length and string[i] in '01234567':
+                                                octal += string[i]
+                                                i += 1
+                                        else:
+                                                break
+                                decoded += chr(int(octal, 8) & 0xFF)
+                                continue
+                        else:
+                                decoded += string[i]
+                else:
+                        decoded += string[i]
+                i += 1
+        return decoded
     
 def vtcheck(md5, vtKey):
     '''

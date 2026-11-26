@@ -582,24 +582,25 @@ class PDFString (PDFObject) :
         self.JSCode = []
         self.unescapedBytes = []
         self.urlsFound = []
-        self.rawValue = unescapeString(self.rawValue)
-        self.value = self.rawValue
-        '''
-        self.value = self.value.replace('\\)',')')
-        self.value = self.value.replace('\\\\','\\')
-        self.value = self.value.replace('\\\r\\\n','')
-        self.value = self.value.replace('\\\r','')
-        self.value = self.value.replace('\\\n','')
-        '''
-        octalNumbers = re.findall('\\\\([0-7]{1,3})', self.value, re.DOTALL)
-        try:
-            for octal in octalNumbers:
-                #TODO: check!! \\\\?
-                self.value = self.value.replace('\\' + octal, chr(int(octal,8)))
-        except:
-            errorMessage = 'Error in octal conversion'
-            self.addError(errorMessage)
-            return (-1,errorMessage)
+        source = self.rawValue
+        self.rawValue = unescapeString(source)
+        # Decrypting runs this again on plaintext that was already decoded.
+        # Keep that second pass as it was. The first decode has to happen on
+        # the original body: unescapeString has already turned \\ into \, so a
+        # later global octal replace cannot tell a literal backslash from an
+        # octal escape and will also rewrite a longer escape that shares a prefix.
+        if decrypt:
+            self.value = self.rawValue
+            octalNumbers = re.findall('\\\\([0-7]{1,3})', self.value, re.DOTALL)
+            try:
+                for octal in octalNumbers:
+                    self.value = self.value.replace('\\' + octal, chr(int(octal,8)))
+            except:
+                errorMessage = 'Error in octal conversion'
+                self.addError(errorMessage)
+                return (-1,errorMessage)
+        else:
+            self.value = decodeLiteralString(source)
         if isJavascript(self.value):
             self.containsJScode = True
             self.JSCode, self.unescapedBytes, self.urlsFound, jsErrors, jsContexts['global'] = analyseJS(self.value, jsContexts['global'], isManualAnalysis)
