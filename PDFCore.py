@@ -7400,7 +7400,7 @@ class PDFParser :
                             return (-1, errorMessage)
                     pdfCrossRefSubSection.setEntries(entries[firstEntry:firstEntry+numObjectsInSubsection])
                     pdfCrossRefSection.addSubsection(pdfCrossRefSubSection)
-                    firstentry = numObjectsInSubsection
+                    firstEntry += numObjectsInSubsection
                     index += 2
                 return (0,pdfCrossRefSection)
             else:
